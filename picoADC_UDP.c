@@ -15,7 +15,6 @@
 
     This include the broadcast, udp transfer, fifo pile block.
     DMA daisy chain, packet ID scheme.
-    
 */
 
 
@@ -38,6 +37,8 @@
 #include "pico/util/queue.h"
 #include "hardware/dma.h"
 #include "picoADC_UDP.h"
+#include "fifoBlock.h"
+
 
 #define ADC_NUM 0
 #define ADC_PIN (26 + ADC_NUM)
@@ -58,12 +59,13 @@ struct udp_pcb  * send_udp_pcb;
 struct udp_pcb  * rcv_udp_pcb;
 
 int32_t blockId=0;
-
+int blockOverrun=0;
 
 // start stop control
 // on stop blockId is zero
 // on stop unit will send  blockId zero with no data
 // when received start blockId is reset and increment with data
+
 StartStopStruct controlBlock;
 
 
@@ -71,51 +73,7 @@ StartStopStruct controlBlock;
 DummyPingStruct  DummyPing;
 
 //  packet block  hold  ADC data and sample block id
-#define BLOCK_MAX  140
-
-SampleBlockStruct block[BLOCK_MAX];
-uint16_t  scrap_AD_Value[SAMPLE_CHUNK_SIZE]; // overrun are transfered there 
-
-// fifo pointer
-uint16_t  head_block=0;
-uint16_t  tail_block=0;
-uint16_t  blockOverrun=0; // how many lost ADC data block
-// fifo block head and tail pointer function
-int getBlock(uint16_t pointer, uint16_t status)
-{
-  for(int loop=0;loop<BLOCK_MAX;loop++)
-     {
-       uint16_t  theBlock = (pointer + loop) % BLOCK_MAX;
-       if(block[theBlock].status ==(uint16_t) status)
-            return theBlock;
-     }
-  return -1;
-}
-
-
-int getHeadBlock(uint16_t status)
-{
-    return( getBlock(head_block++,status));
-}
-
-int getTailBlock(uint16_t status)
-{
-    return( getBlock(tail_block++,status));
-}
-
-int getTotalBlock(uint16_t status)
-{
-  int total=0;
-  for(int loop=0;loop<BLOCK_MAX;loop++)
-     {
-       if(block[loop].blockId==0)  // blockId==0 invalid
-       continue;
-       if(block[loop].status == status)
-        total++;
-     }
-  return total;
-}
-
+uint16_t  scrap_AD_Value[SAMPLE_CHUNK_SIZE]; // overrun are transfered there
 
 // mutex for for block manipulation
 static mutex_t blockMutex;
@@ -276,21 +234,16 @@ void core1_entry()
 
 
 // this routine is to find blockId in block and free block
-void    setAckBlockId(uint32_t blockId)
+void    setAckBlockId(uint32_t blockID)
 {
    if(blockId ==0) return;  // blockId =0 invalid
 
    // lock using mutex
     mutex_enter_blocking(&blockMutex);
 
-   // find blockid
-   for(int loop=0;loop<BLOCK_MAX;loop++)
-     if(block[loop].blockId == blockId)
-       if(block[loop].status & BLOCK_READY)
-         {
-           block[loop].status= BLOCK_FREE;
-           break;
-          }
+    int blockIdx = getBlockId(blockID,BLOCK_READY);
+    if(blockIdx>=0)
+           block[blockIdx].status= BLOCK_FREE;
   // free mutex
   mutex_exit(&blockMutex);
 }

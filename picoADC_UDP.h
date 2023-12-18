@@ -3,6 +3,8 @@
     Add dummy UDP push to see the maximum bandwidth of the Pico
 */
 
+#ifndef picoadcudp
+#define picoadcudp
 
 
 #define  SAMPLE_CHUNK_SIZE 700
@@ -14,11 +16,6 @@
 #define PING_ID      0x474E4950 // 'PING'
 #define HALT_ID      0x544C4148 // 'HALT'
 
-
-// BLOCK STATUS
-#define BLOCK_FREE 0
-#define BLOCK_LOCK 1
-#define BLOCK_READY 2
 
 
 // Packet Structure
@@ -57,3 +54,4 @@ typedef union{
   SampleBlockStruct sample;
 } UnionBlockStruct;
 
+#endif

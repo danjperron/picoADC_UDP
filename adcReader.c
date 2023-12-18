@@ -9,6 +9,7 @@
   #include <string.h>
   #include <signal.h>
   #include "picoADC_UDP.h"
+  #include "fifoBlock.h"
 
   #define BUFLEN 1500
   #define NPACK 100
@@ -29,13 +30,9 @@ StartStopStruct startStopPacket;
 DummyPingStruct  pingPacket;
 AckBlockStruct   ackPacket;
 
-/* simple program to output the number of byte received via UDP
-   hit ctrl-c to stop and output results.
 
-   to compile    gcc -o udp.server udp.server.c
+int blockId=1;
 
-   Copywright(C) Dec 2023, Daniel Perron   MIT license
-*/
 
 
 // Ack knowledge blol id packet
@@ -64,6 +61,29 @@ struct timeval startTime,endTime;
 
    uint32_t currentBlockId;
    uint32_t storeBlockId;
+
+
+  uint32_t searchForBlockId(uint32_t blockID)
+    {
+      for(int loop=0;loop<BLOCK_MAX;loop++)
+       {
+          if(block[loop].status & BLOCK_READY)
+            {
+             if(block[loop].blockId < blockID)
+              {
+                // already got that block just toss it
+                block[loop].status = BLOCK_FREE;
+              }
+             if(block[loop].blockId == blockID)
+                 return loop;
+            }
+       }
+       return -1;
+     }
+
+
+
+
 
   int main(void)
   {
@@ -94,6 +114,11 @@ struct timeval startTime,endTime;
         dieNow("bind");
 
    printf("Waiting for Ping of the pico\n");
+
+
+    // clean block
+   for(int loop=0;loop<BLOCK_MAX;loop++)
+      block[loop].status=BLOCK_FREE;
 
     while(1){
       // wait for data
@@ -127,17 +152,6 @@ struct timeval startTime,endTime;
                            }
                           break;
       case CYCLE_COLLECT_DATA:  // collect data
-/*                         if(unionBlock->ping.packetId == PING_ID)
-                          {
-                            count++;
-                            if(count>3)
-                            {
-                            // something wrong just halt
-                            printf("Something wrong halt!");
-                            exit(0);
-                            }
-                          }
-*/
                           if(nbyte >= sizeof(SampleBlockStruct))
                           {
                             if(unionBlock->sample.packetId == SAMPLE_ID)
@@ -149,11 +163,25 @@ struct timeval startTime,endTime;
                                {
 	                            printf("Ack:%u\n",ackPacket.blockId);
         	                    memset((char *) &si_ack,0, sizeof(si_ack)); 
-              			    si_ack.sin_family = AF_INET;
+              			        si_ack.sin_family = AF_INET;
                         	    si_ack.sin_addr= si_other.sin_addr;
                           	    si_ack.sin_port = htons(TX_PORT);
                            	    sendto(tx_socket, &ackPacket, sizeof(ackPacket), 0,
                                     (struct sockaddr *) &si_ack, sizeof(si_ack));
+                                int16_t idx = getHeadBlock(BLOCK_FREE);
+                                if(idx<0)
+                                      printf("*** overrun ***");
+                                else
+                                      memcpy(&block[idx],unionBlock,sizeof(SampleBlockStruct));
+                                for(int loop=0;loop<5;loop++)
+                                  {
+                                    int16_t idx = searchForBlockId(blockId);
+                                    int16_t totalready = getTotalBlock(BLOCK_READY);
+                                    if(idx<0) break;
+                                     printf("blockId %d block[%d] fill stack %d%%\n",blockId,idx,100 * totalready / BLOCK_MAX);
+                                     blockId++;
+                                  }
+
                                 }
                              }
                           }

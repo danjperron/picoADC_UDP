@@ -11,6 +11,7 @@ pico_sdk_init()
 
 target_sources(${PROJECT} PRIVATE
         ${PROJECT}.c
+        fifoBlock.c
         )
 
 target_compile_definitions(picoADC_UDP PRIVATE
