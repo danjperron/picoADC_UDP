@@ -79,7 +79,7 @@ int getBlock(uint16_t pointer, uint16_t status)
   for(int loop=0;loop<BLOCK_MAX;loop++)
      {
        uint16_t  theBlock = (pointer + loop) % BLOCK_MAX;
-       if(block[theBlock].status == (uint16_t) status)
+       if(block[theBlock].status ==(uint16_t) status)
             return theBlock;
      }
   return -1;
@@ -103,7 +103,7 @@ int getTotalBlock(uint16_t status)
      {
        if(block[loop].blockId==0)  // blockId==0 invalid
        continue;
-       if(block[loop].status & status)
+       if(block[loop].status == status)
         total++;
      }
   return total;
@@ -214,7 +214,12 @@ void core1_entry()
    if(blocknext<0)
    {
      // ok overrun
-     blockOverrun++;
+     if(controlBlock.start_stop)
+      {
+        printf("Got Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
+        blockOverrun++;
+
+      }
    }
    else
    {
@@ -229,8 +234,7 @@ void core1_entry()
     pt= block[blocknext].AD_Value;
     block[blocknext].blockId = blockId;
     block[blocknext].sampleCount= SAMPLE_CHUNK_SIZE;
-    block[blocknext].pilePercent = (100 * totalPile)/BLOCK_MAX;
-    block[blocknext].overrunCount = blockOverrun;
+    block[blocknext].pilePercent =(uint8_t)  (100 * totalPile)/BLOCK_MAX;
    }
    else
    {
@@ -248,7 +252,16 @@ void core1_entry()
 
    // ok Transfer Done  set block to be ready to transfer
    if(blocknow>=0)
-      block[blocknow].status= BLOCK_READY;
+    {
+      if(controlBlock.start_stop)
+        block[blocknow].status= BLOCK_READY;
+      else
+      {
+        block[blocknow].status= BLOCK_FREE;
+        blockId=0;
+        blockOverrun=0;
+      }
+   }
    whichDMA = !whichDMA;  // swap DMA channel
    blocknow=blocknext;
  }
@@ -284,11 +297,12 @@ void resetBlock(void)
     blockId=0;
    for(int loop=0;loop<BLOCK_MAX;loop++)
     {
-       block[loop].blockId = 0xffffffff;  // invalidate block id
+       block[loop].blockId = 0;  // invalidate block id
        block[loop].packetId = SAMPLE_ID;
        block[loop].packetSize = sizeof(SampleBlockStruct);
        block[loop].status= BLOCK_FREE; // Fill all samples in block to have the Ack done.
    }
+   blockOverrun=0;
   mutex_exit(&blockMutex);
 }
 
@@ -317,7 +331,7 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
    strcpy(_RemoteIP, ipaddr_ntoa(addr));
 
      printf("Got Ping from %s\n",_RemoteIP);
-   } 
+   }
    else if(UBK.ack.packetId == ACK_ID)
    {
 //     printf("ack\n");
@@ -427,6 +441,20 @@ int main() {
     int CurrentBlock=-1;
     int counter=0;
     while (1) {
+         if((blockOverrun>0)  && (controlBlock.start_stop!=0))
+             {
+                printf("Overrun !! HALT!\n");
+                resetBlock();
+                // send halt
+                sleep_us(100);
+                uint32_t haltPacket = HALT_ID;
+                if(RemoteIPValid);
+                  SendUDP(RemoteIP,SEND_TO_PORT,&haltPacket,sizeof(uint32_t));
+
+             }
+
+
+
           if(controlBlock.start_stop && RemoteIPValid)
           {
            int blockReady = getTailBlock(BLOCK_READY);
@@ -463,7 +491,11 @@ int main() {
 //                if(controlBlock.start_stop)
 //                  if(RemoteIPValid)
                      {
-//                         printf("broadcast\n");
+                         printf("Pile ready: %u\n",getTotalBlock(BLOCK_READY));
+                         printf("Pile free: %u\n",getTotalBlock(BLOCK_FREE));
+                         printf("Pile LOCK: %u\n",getTotalBlock(BLOCK_LOCK));
+
+                         printf("PING broadcast\n");
                          broadcastUDP(SEND_TO_PORT,&DummyPing,sizeof(DummyPing));
                      }
             }

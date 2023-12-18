@@ -112,13 +112,8 @@ struct timeval startTime,endTime;
                              si_ack.sin_family = AF_INET;
                              si_ack.sin_addr = si_other.sin_addr;
                              si_ack.sin_port = htons(TX_PORT);
-			     inet_ntop(AF_INET, &(si_other.sin_addr), str, INET_ADDRSTRLEN);
-			     printf("Got Pico IP:%s\n",str);
-                             printf("Reset Pico\n");
-                             pingPacket.packetId= PING_ID;
-                             sendto(tx_socket,&pingPacket,sizeof(pingPacket),0,
-                             (struct sockaddr *) &si_ack, sizeof(si_ack));
-                             usleep(10000);
+			                 inet_ntop(AF_INET, &(si_other.sin_addr), str, INET_ADDRSTRLEN);
+			                 printf("Got Pico IP:%s\n",str);
                              printf("Start Pico Capture\n");
                              si_ack.sin_family = AF_INET;
                              si_ack.sin_addr = si_other.sin_addr;
@@ -152,7 +147,7 @@ struct timeval startTime,endTime;
                             if(ackPacket.blockId>0)
                               if(ackPacket.blockId != 0xffffffff)
                                {
-	                         //   printf("Ack:%u\n",ackPacket.blockId);
+	                            printf("Ack:%u\n",ackPacket.blockId);
         	                    memset((char *) &si_ack,0, sizeof(si_ack)); 
               			    si_ack.sin_family = AF_INET;
                         	    si_ack.sin_addr= si_other.sin_addr;

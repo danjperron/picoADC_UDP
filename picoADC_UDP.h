@@ -34,9 +34,8 @@ typedef struct{
    uint16_t sampleCount;
    uint16_t  status;         // enum blockStatus
    // statistic
-   uint16_t resentCount;
-   uint16_t pilePercent;
-   uint16_t overrunCount;
+   uint8_t resentCount;
+   uint8_t pilePercent;
    uint16_t  AD_Value[SAMPLE_CHUNK_SIZE];
 } SampleBlockStruct;
 
