@@ -3,12 +3,18 @@
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
  * SPDX-License-Identifier: BSD-3-Clause
+ *
+ *  The ADC DMA is from the SDKexample
  */
 
 
 /*
     Copyright (c) Dec 2023  , Daniel Perron
     Add dummy UDP push to see the maximum bandwidth of the Pico
+
+    This include the broadcast, udp transfer, fifo pile block.
+    packet ID scheme.
+    
 */
 
 
