@@ -47,3 +47,20 @@ blockReady : 12 /1<br>
 blockReady : 22 /8<br>
 blockReady : 108 /11<br>
 blockReady : 89 /5<br></blockquote>
+
+<br>
+
+<b>To compile the Pico code,</b>
+<blockquote>
+mkdir build<br>
+cd build<br>
+cmake -DPICO_BOARD=pico_w -DWIFI_SSID="Your WIFI ESSID" -DWIFI_PASSWORD="Your WIFI password" ..<br>
+make<br>
+</blockquote>
+
+<br>
+<b>To compile adcReader,</b>
+<blockquote>
+gcc -o adcReader adcReader.c
+</blockquote>blockquote>
+<br>
