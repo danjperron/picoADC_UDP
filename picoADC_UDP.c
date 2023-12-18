@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  *  The ADC DMA is from the SDKexample
+ *  it excludes the daisy chain.
  */
 
 
@@ -13,7 +14,7 @@
     Add dummy UDP push to see the maximum bandwidth of the Pico
 
     This include the broadcast, udp transfer, fifo pile block.
-    packet ID scheme.
+    DMA daisy chain, packet ID scheme.
     
 */
 
