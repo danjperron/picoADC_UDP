@@ -311,9 +311,7 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
          udp_disconnect(send_udp_pcb);
          udp_remove(send_udp_pcb);
          send_udp_pcb = udp_new();
-//         udp_bind(send_udp_pcb, IP_ADDR_ANY, port);
 	     udp_connect(send_udp_pcb, &_addr, SEND_TO_PORT);
-//         udp_bind(send_udp_pcb,&_addr, SEND_TO_PORT ) ;
          printf("Remote IP is %s\n",RemoteIP);
          RemoteIPValid=true;
        }
