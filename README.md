@@ -1,18 +1,30 @@
 Just a proof of concept  to push 200K samples/sec of analog signal conversion from Pico via UDP protocol.
 
-Way out to be finished!
 
-Right now the Pico part is working but still have some bugs to fix. More or less  the detection of overflow to stop and return to standby mode.
+The Pico code is written in C-SDK
+
+The adcReader is written in GCC
+
+
+The pico will broadcast a ping style packet so the adcReader will figure out where the Pico IP is.
+Once it received the Ping the adcReader will send a start command. The start command will start the adc data streams.
+Also with the start command the Pico will know the IP to send the data.
+
+Upon overrun the Pico will stop and start the ping broadcast again.
+
+Core1 takes care of the ADC DMA and push the value into a circular fifo block which ise pratically all the ram
+Core0 reads the fifo block ans transfer it to the UDP socket.
+
+The adcReader is the receiver application. It will output to the stdout!
+
+To store the udp stream into memory you just need to pipe the output to a file.
+
+     ./adcReader >advalue.dat
 
 The adcReader  presently  start the pico process and acknowledge each data transfer. 
-This is a couple of days(evening),
-   Create a circular fifo file to sort and order the missing frame.
-   Once the sequence are sorted enough to write/or output to console output it.
-   On detection of stop from pico just end the program.
+It also use the same fifoBlock file for the fifo block. After 5 seconds of  not receiving data it will exit.
+Except for the adc values all the print are directed to stderr.
 
-Right now the pico will broadcast a ping style packet so the adcReader will figure out where the Pico IP is.
-Once it receives the Ping the adcReader will send a start command. The start command will start the adc data streams.
-Also with the start command the Pico will know the IP to send the data.
 
 <b>It is working </b><br><br>
 Right now I was able to transfer 200K samples/sec. To to that I pratically used the full memory like buffer to be able to resend
@@ -61,6 +73,6 @@ make<br>
 <br>
 <b>To compile adcReader,</b>
 <blockquote>
-gcc -o adcReader adcReader.c
+gcc -pthread adcReader.c fifoBlock.c -lpthread -o adcReader
 </blockquote>blockquote>
 <br>
