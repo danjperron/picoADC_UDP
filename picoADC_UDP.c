@@ -216,6 +216,7 @@ void core1_entry()
    // ok Transfer Done  set block to be ready to transfer
    if(blocknow>=0)
     {
+        block[blocknow].timeStamp = time_us_32();
       if(controlBlock.start_stop)
         block[blocknow].status= BLOCK_READY;
       else
@@ -333,6 +334,7 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
 int main() {
     int loop;
 
+
     // *** to do ***
     // if failed just set the led flashing differently depending of the  error
 
@@ -426,9 +428,15 @@ int main() {
               printf("blockReady : %d /%d\n",blockReady,getTotalBlock(BLOCK_READY));
            if(blockReady>=0)
             {
-              if(blockReady != CurrentBlock)
+
+              if((blockReady != CurrentBlock) || (time_us_32()- block[blockReady].timeStamp > 5000))  // 1500/200k ~ 7.5ms  if more than 5ms just resend
               {
-              if(block[blockReady].blockId==0) continue;
+                block[blockReady].timeStamp=time_us_32();
+              if(block[blockReady].blockId==0)
+                  {
+                     block[blockReady].status=BLOCK_FREE;
+                     continue;
+                  }
 //              printf("send block# %d   blockId:%u\n",blockReady,block[blockReady].blockId);
               SendUDP(&block[blockReady],sizeof(SampleBlockStruct));
               CurrentBlock=blockReady;

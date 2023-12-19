@@ -33,6 +33,7 @@ typedef struct{
    // statistic
    uint8_t resentCount;
    uint8_t pilePercent;
+   uint32_t timeStamp;      // time_us_32() stamp
    uint16_t  AD_Value[SAMPLE_CHUNK_SIZE];
 } SampleBlockStruct;
 
