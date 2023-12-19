@@ -189,6 +189,7 @@ void * rcv_udp_thread(void * arg)
         if(tbyte > SAMPLE_CHUNK_SIZE)
            tbyte= SAMPLE_CHUNK_SIZE;
         fwrite(block[idx].AD_Value,1,tbyte*2,stdout);
+        block[idx].status=BLOCK_FREE; //free this block 
         TotalByte += (uint64_t) tbyte*2;
         gettimeofday(&T2,NULL);
         if(T2.tv_sec!= T1.tv_sec)
