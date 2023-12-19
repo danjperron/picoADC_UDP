@@ -25,9 +25,9 @@ ex:<br>
 or use this method to split in 2GB files.<br>
 &nbsp;&nbsp;&nbsp; <b>./adcReader | spit -b 2G - advalue.dat_</b><br>
 
-The adcReader presently startthe pico process and acknowledge each data transfer. 
-It also use the same fifoBlock.c file uses by picoADC_UDP.
-After 5 seconds of  not receiving data it will exit.
+The adcReader presently startnthe pico process and acknowledge each data transfer. 
+It also uses the same fifoBlock.c from picoADC_UDP.
+After 5 seconds ofnnot receiving data it will exit.
 Except for the adc values all the print are directed to stderr.
 
 
