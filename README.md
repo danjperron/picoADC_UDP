@@ -13,7 +13,7 @@ Also with the start command the Pico will know the IP to send the data.
 Upon overrun the Pico will stop and start the ping broadcast again.
 
 Core1 takes care of the ADC DMA and push the value into a circular fifo block which is pratically all the ram<br>
-Core0 reads the fifo block ans transfer it to the UDP socket.<br>
+Core0 reads the fifo block and transfer it to the UDP socket.<br>
 
 The adcReader is the receiver application. It will output to the stdout!<br>
 
