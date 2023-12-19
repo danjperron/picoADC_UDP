@@ -79,17 +79,15 @@ uint16_t  scrap_AD_Value[SAMPLE_CHUNK_SIZE]; // overrun are transfered there
 static mutex_t blockMutex;
 
 // this is the UDP send packet
-err_t SendUDP(char * IP , int port, void * data, int data_size)
+err_t SendUDP(void * data, int data_size)
 {
       err_t t;
-      ip_addr_t   destAddr;
-      ip4addr_aton(IP,&destAddr);
       struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT,data_size+1,PBUF_RAM);
       char *pt = (char *) p->payload;
       memcpy(pt,data,data_size);
       pt[data_size]='\0';
       cyw43_arch_lwip_begin();
-      t = udp_sendto(send_udp_pcb,p,&destAddr,port);
+      t = udp_send(send_udp_pcb,p);
       cyw43_arch_lwip_end();
       pbuf_free(p);
       return t;
@@ -278,7 +276,7 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
                            u16_t port )            // Sender port 
 {
    char _RemoteIP[256];
-   ip_addr_t _addr;
+   static ip_addr_t _addr;
 
   UnionBlockStruct UBK;
   if(p->len >4)  // need at least 4bytes for id
@@ -309,8 +307,15 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
        {
          // remote IP valid
          strcpy(RemoteIP,_RemoteIP);
-         RemoteIPValid=true;
+         memcpy(&_addr,addr,sizeof(ip_addr_t));
+         udp_disconnect(send_udp_pcb);
+         udp_remove(send_udp_pcb);
+         send_udp_pcb = udp_new();
+//         udp_bind(send_udp_pcb, IP_ADDR_ANY, port);
+	     udp_connect(send_udp_pcb, &_addr, SEND_TO_PORT);
+//         udp_bind(send_udp_pcb,&_addr, SEND_TO_PORT ) ;
          printf("Remote IP is %s\n",RemoteIP);
+         RemoteIPValid=true;
        }
        else
        {
@@ -409,7 +414,7 @@ int main() {
                 sleep_us(100);
                 uint32_t haltPacket = HALT_ID;
                 if(RemoteIPValid);
-                  SendUDP(RemoteIP,SEND_TO_PORT,&haltPacket,sizeof(uint32_t));
+                  SendUDP(&haltPacket,sizeof(uint32_t));
 
              }
 
@@ -427,7 +432,7 @@ int main() {
               {
               if(block[blockReady].blockId==0) continue;
 //              printf("send block# %d   blockId:%u\n",blockReady,block[blockReady].blockId);
-              SendUDP(RemoteIP,SEND_TO_PORT,&block[blockReady],sizeof(SampleBlockStruct));
+              SendUDP(&block[blockReady],sizeof(SampleBlockStruct));
               CurrentBlock=blockReady;
               }
             }
