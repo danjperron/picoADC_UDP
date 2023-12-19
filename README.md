@@ -79,5 +79,5 @@ make<br>
 <b>To compile adcReader,</b>
 <blockquote>
 gcc -pthread adcReader.c fifoBlock.c -lpthread -o adcReader
-</blockquote>blockquote>
+</blockquote>
 <br>
