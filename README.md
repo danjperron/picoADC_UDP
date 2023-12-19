@@ -6,23 +6,28 @@ The Pico code is written in C-SDK
 The adcReader is written in GCC
 
 
-The pico will broadcast a ping style packet so the adcReader will figure out where the Pico IP is.
-Once it received the Ping the adcReader will send a start command. The start command will start the adc data streams.
+The pico will broadcast a ping style packet so the adcReader will figure out what the Pico IP is.
+Once it receives the Ping the adcReader will send a start command. The start command will start the adc data streams.
 Also with the start command the Pico will know the IP to send the data.
 
 Upon overrun the Pico will stop and start the ping broadcast again.
 
-Core1 takes care of the ADC DMA and push the value into a circular fifo block which ise pratically all the ram
-Core0 reads the fifo block ans transfer it to the UDP socket.
+Core1 takes care of the ADC DMA and push the value into a circular fifo block which is pratically all the ram<br>
+Core0 reads the fifo block ans transfer it to the UDP socket.<br>
 
-The adcReader is the receiver application. It will output to the stdout!
+The adcReader is the receiver application. It will output to the stdout!<br>
 
-To store the udp stream into memory you just need to pipe the output to a file.
+To store the udp stream which contains ADC values you just need to pipe the output to a file.<br>
 
-     ./adcReader >advalue.dat
+ex:<br>
+&nbsp;&nbsp;&nbsp; <b>./adcReader >advalue.dat</b><br>
+<br>
+or use this method to split in 2GB files.<br>
+&nbsp;&nbsp;&nbsp; <b>./adcReader | spit -b 2G - advalue.dat_</b><br>
 
-The adcReader  presently  start the pico process and acknowledge each data transfer. 
-It also use the same fifoBlock file for the fifo block. After 5 seconds of  not receiving data it will exit.
+The adcReader presently startthe pico process and acknowledge each data transfer. 
+It also use the same fifoBlock.c file uses by picoADC_UDP.
+After 5 seconds of  not receiving data it will exit.
 Except for the adc values all the print are directed to stderr.
 
 
