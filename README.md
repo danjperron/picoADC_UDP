@@ -15,6 +15,12 @@ Upon overrun the Pico will stop and start the ping broadcast again.
 Core1 takes care of the ADC DMA and push the value into a circular fifo block which is pratically all the ram<br>
 Core0 reads the fifo block and transfers it to the UDP socket.<br>
 
+*** update ***
+The adc transfer now use 12bits instead of 16 bits since the highest nibble was always 0.
+This help be reducing the number of bytes to be send. This way the packet size is smaller and  reduce the bandwith ~25%.
+
+<img src="PicoADCUDP12bitsVS16bits.jpg">
+
 The adcReader is the receiver application. It will output to the stdout!<br>
 
 To store the udp stream which contains ADC values you just need to pipe the output to a file.<br>
