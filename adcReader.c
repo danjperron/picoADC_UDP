@@ -191,7 +191,7 @@ void * rcv_udp_thread(void * arg)
         if(idx<0) { usleep(100); continue;}
         gettimeofday(&startTime, NULL);
 
-        uint tbyte = block[idx].sampleCount*2;
+        uint tbyte = block[idx].sampleCount;
         if(tbyte > SAMPLE_CHUNK_SIZE)
            tbyte= SAMPLE_CHUNK_SIZE;
 
