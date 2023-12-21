@@ -7,7 +7,8 @@
 #define picoadcudp
 
 
-#define  SAMPLE_CHUNK_SIZE 700
+#define  SAMPLE_CHUNK_SIZE 900
+#define  SAMPLE_12BIT_SIZE 1350
 
 // UDP PACKET IDENTIFICATION LABEL
 #define SAMPLE_ID    0x444F5441 // 'ATOD'
@@ -20,6 +21,12 @@
 
 // Packet Structure
 
+typedef  union{
+   uint32_t ui32;
+   uint8_t  ui8[4];
+}union_ui32;
+
+
 typedef struct{
    uint32_t packetId;       // packet id ADID
 } DummyPingStruct;
@@ -29,12 +36,12 @@ typedef struct{
    uint16_t packetSize;
    uint32_t blockId;
    uint16_t sampleCount;
-   uint16_t  status;         // enum blockStatus
+   uint16_t status;         // enum blockStatus
    // statistic
    uint8_t resentCount;
    uint8_t pilePercent;
    uint32_t timeStamp;      // time_us_32() stamp
-   uint16_t  AD_Value[SAMPLE_CHUNK_SIZE];
+   uint8_t  AD_Value[SAMPLE_12BIT_SIZE];  //16bit to 12 bit
 } SampleBlockStruct;
 
 typedef struct{

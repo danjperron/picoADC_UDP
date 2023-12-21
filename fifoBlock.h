@@ -9,9 +9,9 @@
 
 #define BLOCK_MAX 140
 
-#define BLOCK_FREE   1
-#define BLOCK_READY  2
-#define BLOCK_LOCK   4
+#define BLOCK_FREE   0
+#define BLOCK_READY  1
+#define BLOCK_LOCK   2
 
 
 

@@ -18,11 +18,15 @@
   #define TX_PORT 9330
 
 
+
+uint16_t block16[SAMPLE_CHUNK_SIZE];
+
 // packet struct
 
 StartStopStruct startStopPacket;
 DummyPingStruct  pingPacket;
 AckBlockStruct   ackPacket;
+
 
 
 uint64_t TotalByte=0;
@@ -159,12 +163,13 @@ void * rcv_udp_thread(void * arg)
   int main(void)
   {
     int count=0;
-
+    int loop;
+    uint8_t *pt8;
     // ctrl-c stuff
       signal(SIGINT, ctrlC);
 
     // clean block
-    for(int loop=0;loop<BLOCK_MAX;loop++)
+    for(loop=0;loop<BLOCK_MAX;loop++)
       block[loop].status=BLOCK_FREE;
 
 
@@ -185,10 +190,27 @@ void * rcv_udp_thread(void * arg)
         int16_t totalready = getTotalBlock(BLOCK_READY);
         if(idx<0) { usleep(100); continue;}
         gettimeofday(&startTime, NULL);
+
         uint tbyte = block[idx].sampleCount*2;
         if(tbyte > SAMPLE_CHUNK_SIZE)
            tbyte= SAMPLE_CHUNK_SIZE;
-        fwrite(block[idx].AD_Value,1,tbyte*2,stdout);
+
+        // let's convert 12bit to 16 bits
+
+        pt8 = &block[idx].AD_Value[0];
+
+        union_ui32 ui32;
+       for(loop=0;loop<tbyte;loop+=2)
+        {
+           ui32.ui8[0]=*(pt8++);
+           ui32.ui8[1]=*(pt8++);
+           ui32.ui8[2]=*(pt8++);
+           block16[loop]= (uint16_t) ui32.ui32 &0xfff;
+           block16[loop+1]= (uint16_t) (ui32.ui32>>12) &0xfff;
+        }
+
+        fwrite(block16,1,tbyte*2,stdout);
+
         block[idx].status=BLOCK_FREE; //free this block 
         TotalByte += (uint64_t) tbyte*2;
         gettimeofday(&T2,NULL);

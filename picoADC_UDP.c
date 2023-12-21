@@ -36,6 +36,7 @@
 #include <time.h>
 #include "pico/util/queue.h"
 #include "hardware/dma.h"
+#include "hardware/watchdog.h"
 #include "picoADC_UDP.h"
 #include "fifoBlock.h"
 
@@ -45,6 +46,15 @@
 #define ADC_VREF 3.3
 #define ADC_RANGE (1 << 12)
 #define ADC_CONVERT (ADC_VREF / (ADC_RANGE - 1))
+
+
+
+void resetBlock(void);
+
+
+// buffer to hold adc values from dma transfer
+   uint16_t  adc_dma0[SAMPLE_CHUNK_SIZE];
+   uint16_t  adc_dma1[SAMPLE_CHUNK_SIZE];
 
 
 //  UDP SEND TO HOST IP/PORT
@@ -57,6 +67,8 @@ bool RemoteIPValid=false;
 
 struct udp_pcb  * send_udp_pcb;
 struct udp_pcb  * rcv_udp_pcb;
+
+
 
 int32_t blockId=0;
 int blockOverrun=0;
@@ -72,8 +84,6 @@ StartStopStruct controlBlock;
 // ping packet
 DummyPingStruct  DummyPing;
 
-//  packet block  hold  ADC data and sample block id
-uint16_t  scrap_AD_Value[SAMPLE_CHUNK_SIZE]; // overrun are transfered there
 
 // mutex for for block manipulation
 static mutex_t blockMutex;
@@ -119,10 +129,15 @@ err_t broadcastUDP(int port, void * data, int data_size)
 
 void core1_entry()
 {
-   //total pile status
+   //  packet block  hold  ADC data and sample block id
+
+    int sampleIdx;
+    int loop;
     uint16_t  totalPile=0;
+    union_ui32  ui32;
+    uint16_t *pt16;
+    uint8_t *pt8;
    // pt hold the pointer of the ADC data in the current block
-   uint16_t * pt;
 
    // this indicates which DMA are the current one
    int whichDMA = 0;
@@ -157,10 +172,9 @@ void core1_entry()
    blockId=0;
    block[blocknow].blockId = ++blockId;
    block[blocknow].sampleCount= SAMPLE_CHUNK_SIZE;
-   pt= block[blocknow].AD_Value;
 
    dma_channel_configure(dma_0, &c_0,
-        pt,             // dst
+        adc_dma0,             // dst
         &adc_hw->fifo,  // src
         SAMPLE_CHUNK_SIZE,  // transfer count
         true            // start immediately
@@ -179,9 +193,11 @@ void core1_entry()
      // ok overrun
      if(controlBlock.start_stop)
       {
-        printf("Got Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
-        blockOverrun++;
-
+        controlBlock.start_stop=0;
+        printf("\n\nGot Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
+        printf("*******Reset\n\n");
+        watchdog_reboot(0,0,50000);
+        sleep_ms(1000000); // wait for watchdog to reboot;
       }
    }
    else
@@ -194,18 +210,13 @@ void core1_entry()
    ++blockId;
    if(blocknext>=0)
    {
-    pt= block[blocknext].AD_Value;
     block[blocknext].blockId = blockId;
     block[blocknext].sampleCount= SAMPLE_CHUNK_SIZE;
     block[blocknext].pilePercent =(uint8_t)  (100 * totalPile)/BLOCK_MAX;
    }
-   else
-   {
-   pt = scrap_AD_Value;
-   }
    // set DMA  for next transfer
    dma_channel_configure(whichDMA ? dma_0 : dma_1, whichDMA ?  &c_0 : &c_1,
-        pt,             // dst
+        whichDMA ? adc_dma0: adc_dma1,             // dst
         &adc_hw->fifo,  // src
         SAMPLE_CHUNK_SIZE,  // transfer count
         false            // start immediately
@@ -216,9 +227,21 @@ void core1_entry()
    // ok Transfer Done  set block to be ready to transfer
    if(blocknow>=0)
     {
-        block[blocknow].timeStamp = time_us_32();
+      block[blocknow].timeStamp = time_us_32();
       if(controlBlock.start_stop)
+      {
+       // need to transfer adc dma to block  (16 bit to 12bit)
+       pt16 = whichDMA ? adc_dma1 : adc_dma0;
+       pt8  = block[blocknow].AD_Value;
+       for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
+       {
+        ui32.ui32 = ((uint32_t)  pt16[loop] & 0xfff) | ((((uint32_t) pt16[loop+1]) << 12) & 0xfff000);
+        *(pt8++)= ui32.ui8[0];
+        *(pt8++)= ui32.ui8[1];
+        *(pt8++)= ui32.ui8[2];
+       }
         block[blocknow].status= BLOCK_READY;
+      }
       else
       {
         block[blocknow].status= BLOCK_FREE;
@@ -358,6 +381,8 @@ int main() {
         printf("IP: %s\n",ipaddr_ntoa(((const ip_addr_t *)&cyw43_state.netif[0].ip_addr)));
     }
 
+//    printf("sizeof SampleBlockStruct : %d\n",sizeof(SampleBlockStruct));
+
     adc_init();
 
     // Set A/D conversion to be 200K samples/sec
@@ -405,27 +430,27 @@ int main() {
 
     int CurrentBlock=-1;
     int counter=0;
+    int maxPile=0;
+    int currentPile=0;
     while (1) {
-         if((blockOverrun>0)  && (controlBlock.start_stop!=0))
+         if(blockOverrun>0)
              {
-                printf("Overrun !! HALT!\n");
-                resetBlock();
-                // send halt
-                sleep_us(100);
-                uint32_t haltPacket = HALT_ID;
-                if(RemoteIPValid);
-                  SendUDP(&haltPacket,sizeof(uint32_t));
-
+                // wait until it reset
+                sleep_ms(1);
+                continue;
              }
-
-
-
           if(controlBlock.start_stop && RemoteIPValid)
           {
            int blockReady = getTailBlock(BLOCK_READY);
+           currentPile = getTotalBlock(BLOCK_READY);
+           if(currentPile > maxPile)
+             maxPile=currentPile;
 
            if((++counter % 10000)==0)
-              printf("blockReady : %d /%d\n",blockReady,getTotalBlock(BLOCK_READY));
+            {
+              printf("blockId: %d  MaxPile::%d\n",blockId,maxPile);
+              maxPile=0;
+            }
            if(blockReady>=0)
             {
 
@@ -439,6 +464,8 @@ int main() {
                   }
 //              printf("send block# %d   blockId:%u\n",blockReady,block[blockReady].blockId);
               SendUDP(&block[blockReady],sizeof(SampleBlockStruct));
+
+
               CurrentBlock=blockReady;
               }
             }
@@ -459,16 +486,11 @@ int main() {
                     sleep_us(50);
                     count++;
                 }
-//                if(controlBlock.start_stop)
-//                  if(RemoteIPValid)
-                     {
-                         printf("Pile ready: %u\n",getTotalBlock(BLOCK_READY));
-                         printf("Pile free: %u\n",getTotalBlock(BLOCK_FREE));
-                         printf("Pile LOCK: %u\n",getTotalBlock(BLOCK_LOCK));
-
-                         printf("PING broadcast\n");
-                         broadcastUDP(SEND_TO_PORT,&DummyPing,sizeof(DummyPing));
-                     }
+                printf("Pile ready: %u\n",getTotalBlock(BLOCK_READY));
+                printf("Pile free: %u\n",getTotalBlock(BLOCK_FREE));
+                printf("Pile LOCK: %u\n",getTotalBlock(BLOCK_LOCK));
+                printf("PING broadcast\n");
+                broadcastUDP(SEND_TO_PORT,&DummyPing,sizeof(DummyPing));
             }
          cyw43_arch_poll();
         }
