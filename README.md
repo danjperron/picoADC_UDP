@@ -86,3 +86,16 @@ make<br>
 gcc -pthread adcReader.c fifoBlock.c -lpthread -o adcReader
 </blockquote>
 <br>
+<b>Version 1.3  Dec 21</b><br>
+
+- Option in control packet to reset on overrun.<br>
+- Add revision number 1.3.<br>
+- Add Makefile on root to compile adcReader with different fifo buffer size.<br>
+- Put 64bit timestamp on block. <br>
+- Add the number of packet missed count.<br>
+- Clean  usb serial output display. I use minicom /dev/ttyACM0 on the Pi.<br>
+
+<b>to do,</b> (more like a wish list)<br>
+- add argument to include timestamp into output.<br>
+- add argument to save to a file instead of stdout.<br>
+- add argument to set sample rate and set 2 or 1 channels<br>

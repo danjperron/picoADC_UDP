@@ -68,6 +68,28 @@ uint32_t searchForBlockId(uint32_t blockID)
 }
 
 
+uint32_t searchForPreviousBlockId(uint32_t blockID)
+{
+  for(int loop=0;loop<BLOCK_MAX;loop++)
+   {
+      if(block[loop].status & BLOCK_READY)
+        {
+         if(block[loop].blockId < blockID)
+          {
+            // already got that block just toss it
+            block[loop].status = BLOCK_FREE;
+          }
+         if(block[loop].blockId == blockID)
+             return loop;
+         if(block[loop].previousValidBlockId == blockID)
+             return loop;
+        }
+   }
+   return -1;
+}
+
+
+
 
 void * rcv_udp_thread(void * arg)
 {
@@ -112,6 +134,7 @@ void * rcv_udp_thread(void * arg)
              si_ack.sin_port = htons(TX_PORT);
              startStopPacket.packetId= STARTSTOP_ID;
              startStopPacket.start_stop=1;
+             startStopPacket.skipOverrunBlock=1;
              sendto(tx_socket, &startStopPacket, sizeof(startStopPacket), 0,
              (struct sockaddr *) &si_ack, sizeof(si_ack));
              blockId=1;
@@ -188,7 +211,26 @@ void * rcv_udp_thread(void * arg)
          }
         int16_t idx = searchForBlockId(blockId);
         int16_t totalready = getTotalBlock(BLOCK_READY);
-        if(idx<0) { usleep(100); continue;}
+        if(idx <0)
+         {
+           if(totalready > (BLOCK_MAX - 10))
+              {
+                 idx = searchForPreviousBlockId(blockId);
+              }
+           if(idx<0)
+              {
+                if(totalready > (BLOCK_MAX-5))
+                  {
+                   idx = getTailLowerBlock(BLOCK_READY,blockId);
+                  }
+               }
+           if(idx>=0)
+            {
+              fprintf(stderr,"Total ready = %d Skip from blockid %d to %d  \n",totalready,blockId, block[idx].blockId);
+            }
+         }
+
+        if(idx<0) {/* usleep(100);*/ continue;}
         gettimeofday(&startTime, NULL);
 
         uint tbyte = block[idx].sampleCount;
@@ -211,15 +253,16 @@ void * rcv_udp_thread(void * arg)
 
         fwrite(block16,1,tbyte*2,stdout);
 
+        blockId= block[idx].blockId+1;
         block[idx].status=BLOCK_FREE; //free this block 
         TotalByte += (uint64_t) tbyte*2;
         gettimeofday(&T2,NULL);
         if(T2.tv_sec!= T1.tv_sec)
          {
-          fprintf(stderr,"blockId: %-10lu  Total: %-10lluKB\r",blockId,TotalByte / 1000);
+          fprintf(stderr,"blockId: %-10lu  Total: %-10lluKB  Stack:%d%%\r",blockId,TotalByte / 1000,
+                  (100*totalready)/BLOCK_MAX);
           T1=T2;
          }
-         blockId++;
         }
     pthread_exit(NULL);
     return 0;

@@ -47,7 +47,8 @@
 #define ADC_RANGE (1 << 12)
 #define ADC_CONVERT (ADC_VREF / (ADC_RANGE - 1))
 
-
+#define MY_VERSION    1
+#define MY_SUBVERSION 3
 
 void resetBlock(void);
 
@@ -60,7 +61,7 @@ void resetBlock(void);
 //  UDP SEND TO HOST IP/PORT
 
 //#define  SEND_TO_IP  "10.11.12.135"
-char RemoteIP[256];
+char RemoteIP[128];
 bool RemoteIPValid=false;
 #define  SEND_TO_PORT 9330
 #define  RCV_PORT   9330
@@ -71,7 +72,9 @@ struct udp_pcb  * rcv_udp_pcb;
 
 
 int32_t blockId=0;
-int blockOverrun=0;
+int32_t previousBlockId=0;
+int overrunCount=0;
+
 
 // start stop control
 // on stop blockId is zero
@@ -83,7 +86,7 @@ StartStopStruct controlBlock;
 
 // ping packet
 DummyPingStruct  DummyPing;
-
+int pingFlag=0;
 
 // mutex for for block manipulation
 static mutex_t blockMutex;
@@ -121,8 +124,9 @@ err_t broadcastUDP(int port, void * data, int data_size)
       return t;
 }
 
-
-// core1
+//   ***********************************
+//   **********    core1   *************
+//   ***********************************
 //   do ADC DMA transfer and  push data to  block via fifo
 //   each block hold data structure and  SAMPLE_CHUNK_SIZE of ADC data
 //   we have BLOCK_size number of block
@@ -163,15 +167,6 @@ void core1_entry()
     channel_config_set_dreq(&c_1, DREQ_ADC);
 
    // start first DMA , get head block and  lock block
-   mutex_enter_blocking(&blockMutex);
-   int blocknow =  getHeadBlock(BLOCK_FREE);
-   block[blocknow].status = BLOCK_LOCK;
-   mutex_exit(&blockMutex);
-
-   // first block
-   blockId=0;
-   block[blocknow].blockId = ++blockId;
-   block[blocknow].sampleCount= SAMPLE_CHUNK_SIZE;
 
    dma_channel_configure(dma_0, &c_0,
         adc_dma0,             // dst
@@ -179,41 +174,11 @@ void core1_entry()
         SAMPLE_CHUNK_SIZE,  // transfer count
         true            // start immediately
       );
-
   // ok we are ready let's start the ADC
    adc_run(true);
 
- while(1)
+  while(1)
   {
-   //  mutex lock, get next head
-   mutex_enter_blocking(&blockMutex);
-   int blocknext =  getHeadBlock(BLOCK_FREE);
-   if(blocknext<0)
-   {
-     // ok overrun
-     if(controlBlock.start_stop)
-      {
-        controlBlock.start_stop=0;
-        printf("\n\nGot Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
-        printf("*******Reset\n\n");
-        watchdog_reboot(0,0,50000);
-        sleep_ms(1000000); // wait for watchdog to reboot;
-      }
-   }
-   else
-   {
-      block[blocknext].status = BLOCK_LOCK;
-      totalPile = getTotalBlock(BLOCK_READY);
-   }
-   mutex_exit(&blockMutex);
-
-   ++blockId;
-   if(blocknext>=0)
-   {
-    block[blocknext].blockId = blockId;
-    block[blocknext].sampleCount= SAMPLE_CHUNK_SIZE;
-    block[blocknext].pilePercent =(uint8_t)  (100 * totalPile)/BLOCK_MAX;
-   }
    // set DMA  for next transfer
    dma_channel_configure(whichDMA ? dma_0 : dma_1, whichDMA ?  &c_0 : &c_1,
         whichDMA ? adc_dma0: adc_dma1,             // dst
@@ -223,35 +188,67 @@ void core1_entry()
       );
    // wait until dma is done
    dma_channel_wait_for_finish_blocking(whichDMA ? dma_1 : dma_0);
-
-   // ok Transfer Done  set block to be ready to transfer
-   if(blocknow>=0)
+   int theBlock = -1;
+   if(controlBlock.start_stop)
     {
-      block[blocknow].timeStamp = time_us_32();
-      if(controlBlock.start_stop)
-      {
-       // need to transfer adc dma to block  (16 bit to 12bit)
-       pt16 = whichDMA ? adc_dma1 : adc_dma0;
-       pt8  = block[blocknow].AD_Value;
-       for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
-       {
-        ui32.ui32 = ((uint32_t)  pt16[loop] & 0xfff) | ((((uint32_t) pt16[loop+1]) << 12) & 0xfff000);
-        *(pt8++)= ui32.ui8[0];
-        *(pt8++)= ui32.ui8[1];
-        *(pt8++)= ui32.ui8[2];
-       }
-        block[blocknow].status= BLOCK_READY;
-      }
-      else
-      {
-        block[blocknow].status= BLOCK_FREE;
-        blockId=0;
-        blockOverrun=0;
-      }
-   }
-   whichDMA = !whichDMA;  // swap DMA channel
-   blocknow=blocknext;
- }
+       theBlock = getHeadBlock(BLOCK_FREE);
+       blockId++;
+       if(theBlock>=0)
+        {
+          // ok Lock the block
+          mutex_enter_blocking(&blockMutex);
+          block[theBlock].status=BLOCK_LOCK;
+          mutex_exit(&blockMutex);
+          // fill the block
+          block[theBlock].blockId = blockId;
+          previousBlockId = blockId;
+          block[theBlock].version = MY_VERSION<<8 | MY_SUBVERSION;
+          block[theBlock].sampleCount= SAMPLE_CHUNK_SIZE;
+          totalPile = getTotalBlock(BLOCK_READY);
+          block[theBlock].overrunCount = overrunCount;
+          overrunCount=0;
+          block[theBlock].pilePercent =(uint8_t)  (100 * totalPile)/BLOCK_MAX;
+          block[theBlock].timeStamp = time_us_64();
+          // fill data
+          // need to transfer adc dma to block  (16 bit to 12bit)
+           pt16 = whichDMA ? adc_dma1 : adc_dma0;
+           pt8  = block[theBlock].AD_Value;
+           for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
+           {
+            ui32.ui32 = ((uint32_t)  pt16[loop] & 0xfff) | ((((uint32_t) pt16[loop+1]) << 12) & 0xfff000);
+            *(pt8++)= ui32.ui8[0];
+            *(pt8++)= ui32.ui8[1];
+            *(pt8++)= ui32.ui8[2];
+           }
+           // Done set it ready
+           block[theBlock].status= BLOCK_READY;
+           watchdog_update();
+          }
+        else
+        {
+             printf("\nGot Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
+
+             if(controlBlock.skipOverrunBlock)
+             {
+               printf("Continue! Increment OverrunCount to %d\n",++overrunCount);
+             }
+             else
+               {
+                 // ok overrun
+                    controlBlock.start_stop=0;
+                    printf("*******Reset\n\n");
+                    watchdog_reboot(0,0,50000);
+                    sleep_ms(1000000); // wait for watchdog to reboot;
+                }
+        }
+     }
+     else
+        {
+          blockId=0;
+          previousBlockId=0;
+        }
+     whichDMA = !whichDMA;  // swap DMA channel
+  }
 }
 
 
@@ -284,12 +281,12 @@ void resetBlock(void)
        block[loop].packetSize = sizeof(SampleBlockStruct);
        block[loop].status= BLOCK_FREE; // Fill all samples in block to have the Ack done.
    }
-   blockOverrun=0;
+  overrunCount=0;
   mutex_exit(&blockMutex);
 }
 
 
-
+// ***************  UDP RECEIVE CALLBACK  ******
 // this is the received UDP callback
 // get control or ack from remote pc
 
@@ -347,6 +344,7 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
      resetBlock();
      mutex_enter_blocking(&blockMutex);
      controlBlock.start_stop= UBK.control.start_stop;
+     controlBlock.skipOverrunBlock = UBK.control.skipOverrunBlock;
     mutex_exit(&blockMutex);
    }
   }
@@ -354,21 +352,23 @@ void udp_receive_callback( void* arg,              // User argument - udp_recv `
 }
 
 
+// **************  main *************
+
 int main() {
     int loop;
 
-
-    // *** to do ***
-    // if failed just set the led flashing differently depending of the  error
-
     stdio_init_all();
-
+    sleep_ms(1600);
+    printf("\n");
+    printf("\npicoADC_UDP V%d.%d\n",MY_VERSION,MY_SUBVERSION);
+    sleep_ms(5000);
     // initialize wifi
 
     if (cyw43_arch_init()) {
         printf("Init failed!\n");
         return 1;
     }
+
     cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
     cyw43_arch_enable_sta_mode();
 
@@ -377,11 +377,11 @@ int main() {
         printf("failed!\n");
         return 1;
     } else {
-        printf("Connected.n");
+        printf("Connected to %s .\n",WIFI_SSID);
         printf("IP: %s\n",ipaddr_ntoa(((const ip_addr_t *)&cyw43_state.netif[0].ip_addr)));
     }
 
-//    printf("sizeof SampleBlockStruct : %d\n",sizeof(SampleBlockStruct));
+    printf("sizeof SampleBlockStruct : %d\n",sizeof(SampleBlockStruct));
 
     adc_init();
 
@@ -406,10 +406,9 @@ int main() {
    strcpy(RemoteIP,"");
 
 
-   printf("start\n");
-
    // set dummyPing packet ID
    DummyPing.packetId = PING_ID;
+   DummyPing.version = MY_VERSION<<8 | MY_SUBVERSION;
 
     // create mutex to ack block id
     mutex_init(&blockMutex);
@@ -428,21 +427,17 @@ int main() {
 
     multicore_launch_core1(core1_entry);
 
+    watchdog_enable( 0x7fffff,1);
     int CurrentBlock=-1;
     int counter=0;
     int maxPile=0;
     int currentPile=0;
     while (1) {
-         if(blockOverrun>0)
-             {
-                // wait until it reset
-                sleep_ms(1);
-                continue;
-             }
           if(controlBlock.start_stop && RemoteIPValid)
           {
-           int blockReady = getTailBlock(BLOCK_READY);
-           currentPile = getTotalBlock(BLOCK_READY);
+           int blockReady= getTailBlock(BLOCK_READY);
+           if(blockReady>=0)
+               currentPile = getTotalBlock(BLOCK_READY);
            if(currentPile > maxPile)
              maxPile=currentPile;
 
@@ -462,14 +457,12 @@ int main() {
                      block[blockReady].status=BLOCK_FREE;
                      continue;
                   }
-//              printf("send block# %d   blockId:%u\n",blockReady,block[blockReady].blockId);
               SendUDP(&block[blockReady],sizeof(SampleBlockStruct));
 
 
               CurrentBlock=blockReady;
               }
             }
-            sleep_us(100);
            }
            else
             {
@@ -486,10 +479,15 @@ int main() {
                     sleep_us(50);
                     count++;
                 }
-                printf("Pile ready: %u\n",getTotalBlock(BLOCK_READY));
-                printf("Pile free: %u\n",getTotalBlock(BLOCK_FREE));
-                printf("Pile LOCK: %u\n",getTotalBlock(BLOCK_LOCK));
-                printf("PING broadcast\n");
+//                printf("Pile ready: %u\n",getTotalBlock(BLOCK_READY));
+//                printf("Pile free: %u\n",getTotalBlock(BLOCK_FREE));
+//                printf("Pile LOCK: %u\n",getTotalBlock(BLOCK_LOCK));
+                if(pingFlag)
+                   putchar(pingFlag == 79 ? '\n' : '.');
+                else
+                    printf("PING broadcast ");
+                watchdog_update();
+                pingFlag= ++pingFlag % 80;
                 broadcastUDP(SEND_TO_PORT,&DummyPing,sizeof(DummyPing));
             }
          cyw43_arch_poll();

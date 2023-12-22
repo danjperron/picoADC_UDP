@@ -7,8 +7,9 @@
 #define picoadcudp
 
 
-#define  SAMPLE_CHUNK_SIZE 900
-#define  SAMPLE_12BIT_SIZE 1350
+#define  SAMPLE_CHUNK_SIZE 800
+#define  SAMPLE_12BIT_SIZE 1200
+
 
 // UDP PACKET IDENTIFICATION LABEL
 #define SAMPLE_ID    0x444F5441 // 'ATOD'
@@ -29,18 +30,21 @@ typedef  union{
 
 typedef struct{
    uint32_t packetId;       // packet id ADID
+   uint16_t version;
 } DummyPingStruct;
 
 typedef struct{
    uint32_t packetId;       // packet id ADID
    uint16_t packetSize;
    uint32_t blockId;
+   uint32_t previousValidBlockId;
    uint16_t sampleCount;
    uint16_t status;         // enum blockStatus
    // statistic
-   uint8_t resentCount;
+   uint16_t version;
+   uint8_t  overrunCount;
    uint8_t pilePercent;
-   uint32_t timeStamp;      // time_us_32() stamp
+   uint64_t timeStamp;      // time_us_32() stamp
    uint8_t  AD_Value[SAMPLE_12BIT_SIZE];  //16bit to 12 bit
 } SampleBlockStruct;
 
@@ -50,8 +54,10 @@ typedef struct{
 } AckBlockStruct;
 
 typedef struct{
-   uint32_t packetId;        // packet ID STID
+   uint32_t packetId;          // packet ID STID
    uint16_t start_stop;        // packet ID
+   uint16_t skipOverrunBlock;  // 0=> halt and reset  1=> just forget ,
+                               // nbSkipBlock++ and wait for next one.
 } StartStopStruct;
 
 
