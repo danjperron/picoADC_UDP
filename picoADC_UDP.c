@@ -449,9 +449,9 @@ int main() {
            if(blockReady>=0)
             {
 
-              if((blockReady != CurrentBlock) || (time_us_32()- block[blockReady].timeStamp > 5000))  // 1500/200k ~ 7.5ms  if more than 5ms just resend
+              if((blockReady != CurrentBlock) || (time_us_64()- block[blockReady].timeStamp > 5000))  // 1500/200k ~ 7.5ms  if more than 5ms just resend
               {
-                block[blockReady].timeStamp=time_us_32();
+                block[blockReady].timeStamp=time_us_64();
               if(block[blockReady].blockId==0)
                   {
                      block[blockReady].status=BLOCK_FREE;

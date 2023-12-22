@@ -44,7 +44,7 @@ typedef struct{
    uint16_t version;
    uint8_t  overrunCount;
    uint8_t pilePercent;
-   uint64_t timeStamp;      // time_us_32() stamp
+   uint64_t timeStamp;      // time_us_64() stamp
    uint8_t  AD_Value[SAMPLE_12BIT_SIZE];  //16bit to 12 bit
 } SampleBlockStruct;
 
