@@ -17,8 +17,6 @@ target_sources(${PROJECT} PRIVATE
 target_compile_definitions(picoADC_USB PRIVATE
             )
 
-
-
 target_include_directories(${PROJECT} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(${PROJECT}
      pico_stdlib

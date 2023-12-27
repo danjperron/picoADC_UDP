@@ -35,7 +35,6 @@
 #include "fifoBlock.h"
 
 
-
 //  use serial UART   for info
 //  serial usb is the printf but will output data to raspberry pi
 
@@ -66,32 +65,81 @@ void resetBlock(void);
 // buffer to hold adc values from dma transfer
    uint16_t  adc_dma0[SAMPLE_CHUNK_SIZE];
    uint16_t  adc_dma1[SAMPLE_CHUNK_SIZE];
-   char adc_hex[SAMPLE_CHUNK_SIZE*3+10];
+   char adc_hex[SAMPLE_BYTE_SIZE*2+32];
 
 int32_t blockId=0;
 
 
+#define USE_BASE64
+//#define USE_HEX12
 
+#ifdef USE_BASE64
+static char base64Table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                                '4', '5', '6', '7', '8', '9', '+', '/'};
+#endif
 const char  hexTable [16]= {'0','1','2','3','4','5','6','7',
                             '8','9','A','B','C','D','E','F'};
 
 void SendToUSB(int idx)
 {
  int loop;
- uint16_t temp16;
- printf("%08llX\t", block[idx].timeStamp);
+ int16_t temp16;
+ int8_t *pt8;
+ int64_t temp64;
  char *pt = adc_hex;
- for(loop=0;loop<SAMPLE_CHUNK_SIZE;loop++)
+
+temp64 = block[idx].timeStamp;
+
+
+// ok just 48bits microsecond for timeStamp is enough
+for(loop=44;loop>=0;loop-=4)
+    *(pt++) = hexTable[(temp64 >> loop) & 0xf];
+*(pt++) = '\t';
+
+pt8 = block[idx].AD_Value;
+
+#ifdef USE_BASE64
+   for(loop=0;loop<SAMPLE_BYTE_SIZE;loop+=3)
     {
-      temp16=block[idx].AD_Value[loop];
-      *(pt++)= hexTable[(temp16>>8) & 0xf];
-      *(pt++)= hexTable[(temp16>4) & 0xf];
-      *(pt++)= hexTable[temp16 & 0xf];
+        *(pt++)= base64Table[(*pt8 >>2) & 0x3f];   // 11111111 => 00111111
+        temp16 = ((*(pt8++) & 3) <<8);             // 1100000000
+        temp16 |= *(pt8++);                        // 1122222222
+        *(pt++)= base64Table[(temp16 >> 4) & 0x3f];// 112222
+        temp16 =  ((temp16<<8) & 0x0f00) | *(pt8++); // 222233333333
+        *(pt++)= base64Table[(temp16 >> 6) & 0x3f];
+        *(pt++)= base64Table[temp16 & 0x3f];
     }
+#else
+    for(loop=0;loop<SAMPLE_BYTE_SIZE;loop++)
+    {
+      *(pt++)= hexTable[(*pt8>>4) & 0xf];
+      *(pt++)= hexTable[(*pt8++) & 0xf];
+    }
+#endif
+
+#ifdef  USE_BASE64
+   *(pt++) = '=';
    *(pt++) = '\n';
-   fwrite(adc_hex,1,SAMPLE_CHUNK_SIZE*3+1,stdout);
+   *(pt++) = 0;
+   puts_raw(adc_hex);
+#else
+   *(pt++) = '\n';
+   *(pt++) = 0;
+   puts_raw(adc_hex);
+#endif
    stdio_flush();
+
 }
+
+
+
+
 
 
 //   ***********************************
@@ -104,7 +152,8 @@ void SendToUSB(int idx)
 void core1_entry()
 {
    //  packet block  hold  ADC data and sample block id
-
+    uint16_t *pt16;
+    uint8_t *pt8;
     int Idx;
 
    // this indicates which DMA are the current one
@@ -159,7 +208,17 @@ void core1_entry()
    {
       block[Idx].blockId = blockId;
       block[Idx].timeStamp = time_us_64();
-      memcpy(block[Idx].AD_Value,whichDMA? adc_dma0 : adc_dma1,SAMPLE_CHUNK_SIZE*sizeof(uint16_t));
+      // pack to 12 bits
+      pt16 = whichDMA ? adc_dma1 : adc_dma0;
+      pt8  = block[Idx].AD_Value;
+      uint8_t temp8;
+       for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
+       {
+        *(pt8++)= *pt16 >> 4;
+        temp8 = (*(pt16++) << 4) & 0xf0;
+        *(pt8++)=  temp8 | ((*pt16 >> 8) & 0xf);
+        *(pt8++)= *(pt16++) & 0xff;
+       }
       // done move head
       nextHeadBlock();
    }
@@ -184,7 +243,6 @@ void resetBlock(void)
 int main() {
     int loop;
     char sbuffer[128];
-
     stdio_init_all();
     stdio_set_translate_crlf(&stdio_usb, false);
 
@@ -238,6 +296,5 @@ int main() {
            }
     return 0;
 }
-
 
 

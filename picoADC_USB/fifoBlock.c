@@ -18,6 +18,14 @@ int getHeadBlock()
     return head_block;
 }
 
+int getNextHeadBlock()
+{
+    int new_head = (head_block + 1) % BLOCK_MAX;
+    if(new_head == tail_block)
+       return -1;
+    return new_head;
+}
+
 int getTailBlock()
 {
     if( tail_block == head_block)
