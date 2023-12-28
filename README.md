@@ -15,6 +15,19 @@ Upon overrun the Pico will stop and start the ping broadcast again.
 Core1 takes care of the ADC DMA and push the value into a circular fifo block which is pratically all the ram<br>
 Core0 reads the fifo block and transfers it to the UDP socket.<br>
 
+
+*** new update USB SERIAL ** dec 28
+USB serial communication added.<br>
+16 bits to 12 bits conversion and then encoded in base64 (including 6 bytes time_us_64() stamp)<br>
+On Pi5 you need to use the base64 since the PI5 on USB serial is slower.
+On Pi4 no problem.
+To decode the signal you need to decode base64 first. the first 6 bytes are the timeStamp. the next are 12bits sample.
+ 3 bytes convert to 2 samples of 12 bytes.
+
+
+
+
+
 *** update ***
 The adc transfer now use 12bits instead of 16 bits since the highest nibble was always 0.
 This help be reducing the number of bytes to be send. This way the packet size is smaller and  reduce the bandwith ~25%.

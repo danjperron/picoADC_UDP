@@ -82,6 +82,37 @@ static char base64Table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
                                 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
                                 'w', 'x', 'y', 'z', '0', '1', '2', '3',
                                 '4', '5', '6', '7', '8', '9', '+', '/'};
+static int mod_table[] = {0, 2, 1};
+
+char *  base64_encode(char *dest, const unsigned char *data,int input_length)
+{
+    int output_length = 4 * ((input_length + 2) / 3);
+
+
+    for (int i = 0, j = 0; i < input_length;) {
+
+        uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+        uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+        uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+
+        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
+        *(dest++) = base64Table[(triple >> 18) & 0x3F];
+        *(dest++) = base64Table[(triple >> 12) & 0x3F];
+        *(dest++) = base64Table[(triple >> 6) & 0x3F];
+        *(dest++) = base64Table[triple  & 0x3F];
+    }
+
+    for (int i = 0; i < mod_table[input_length % 3]; i++)
+        *(dest++) = '=';
+    return dest;
+}
+
+
+
+
+
+
 #endif
 const char  hexTable [16]= {'0','1','2','3','4','5','6','7',
                             '8','9','A','B','C','D','E','F'};
@@ -89,32 +120,28 @@ const char  hexTable [16]= {'0','1','2','3','4','5','6','7',
 void SendToUSB(int idx)
 {
  int loop;
- int16_t temp16;
+ int8_t temp8; 
+int16_t temp16;
  int8_t *pt8;
  int64_t temp64;
- char *pt = adc_hex;
-
-temp64 = block[idx].timeStamp;
+ char *pt;
 
 
 // ok just 48bits microsecond for timeStamp is enough
+#ifdef USE_BASE64
+pt = base64_encode((char *) adc_hex,(unsigned char *) &block[idx].timeStamp,6);
+
+#else
+ char *pt;=adc_hex
+
 for(loop=44;loop>=0;loop-=4)
     *(pt++) = hexTable[(temp64 >> loop) & 0xf];
 *(pt++) = '\t';
-
+#endif
 pt8 = block[idx].AD_Value;
 
 #ifdef USE_BASE64
-   for(loop=0;loop<SAMPLE_BYTE_SIZE;loop+=3)
-    {
-        *(pt++)= base64Table[(*pt8 >>2) & 0x3f];   // 11111111 => 00111111
-        temp16 = ((*(pt8++) & 3) <<8);             // 1100000000
-        temp16 |= *(pt8++);                        // 1122222222
-        *(pt++)= base64Table[(temp16 >> 4) & 0x3f];// 112222
-        temp16 =  ((temp16<<8) & 0x0f00) | *(pt8++); // 222233333333
-        *(pt++)= base64Table[(temp16 >> 6) & 0x3f];
-        *(pt++)= base64Table[temp16 & 0x3f];
-    }
+   pt = base64_encode((char *) pt,(unsigned char *) pt8,SAMPLE_BYTE_SIZE);
 #else
     for(loop=0;loop<SAMPLE_BYTE_SIZE;loop++)
     {
@@ -123,16 +150,9 @@ pt8 = block[idx].AD_Value;
     }
 #endif
 
-#ifdef  USE_BASE64
-   *(pt++) = '=';
    *(pt++) = '\n';
    *(pt++) = 0;
    puts_raw(adc_hex);
-#else
-   *(pt++) = '\n';
-   *(pt++) = 0;
-   puts_raw(adc_hex);
-#endif
    stdio_flush();
 
 }
@@ -214,10 +234,10 @@ void core1_entry()
       uint8_t temp8;
        for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
        {
-        *(pt8++)= *pt16 >> 4;
-        temp8 = (*(pt16++) << 4) & 0xf0;
-        *(pt8++)=  temp8 | ((*pt16 >> 8) & 0xf);
-        *(pt8++)= *(pt16++) & 0xff;
+        *(pt8++)= *pt16 & 0xff;
+        temp8 = (*(pt16++) >>8) & 0xf;
+        *(pt8++)=  temp8 | ((*pt16 << 4) & 0xf0);
+        *(pt8++)= (*(pt16++)>>4) & 0xff;
        }
       // done move head
       nextHeadBlock();
