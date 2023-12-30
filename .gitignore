@@ -53,3 +53,4 @@ dkms.conf
 build/
 adcReader
 picoADC_USB/build
+picoADC_SDCARD/build
