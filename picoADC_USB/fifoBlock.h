@@ -28,7 +28,7 @@ uint8_t AD_Value[SAMPLE_BYTE_SIZE];
 } SampleBlockStruct;
 
 
-SampleBlockStruct block[BLOCK_MAX];
+extern SampleBlockStruct block[BLOCK_MAX];
 
 // fifo block head and tail pointer function
 int getHeadBlock();
