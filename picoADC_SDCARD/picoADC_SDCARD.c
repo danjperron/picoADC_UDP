@@ -290,7 +290,7 @@ if(Tlen==0)
      f_write(&fil, pt,ptSize,&ptWritten);
      Tlen += ptSize;
 //     printf("%d written. Total= %llu bytes\n",ptWritten,Tlen);
-   if(Tlen > 2000000000)
+   if(Tlen > 2100000000)
      {
        f_close(&fil);
        Tlen=0;
