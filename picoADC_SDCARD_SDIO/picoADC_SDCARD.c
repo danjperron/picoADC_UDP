@@ -49,6 +49,44 @@
 #include "rtc.h"
 #include "hw_config.h"
 
+/* SDIO Interface */
+static sd_sdio_if_t sdio_if = {
+    /*
+    Pins CLK_gpio, D1_gpio, D2_gpio, and D3_gpio are at offsets from pin D0_gpio.
+    The offsets are determined by sd_driver\SDIO\rp2040_sdio.pio.
+        CLK_gpio = (D0_gpio + SDIO_CLK_PIN_D0_OFFSET) % 32;
+        As of this writing, SDIO_CLK_PIN_D0_OFFSET is 30,
+            which is -2 in mod32 arithmetic, so:
+        CLK_gpio = D0_gpio -2.
+        D1_gpio = D0_gpio + 1;
+        D2_gpio = D0_gpio + 2;
+        D3_gpio = D0_gpio + 3;
+    */
+    .CMD_gpio = 7,
+    .D0_gpio = 8,
+    .baud_rate = 12 * 1000 * 1000  // 15 MHz
+};
+
+/* Hardware Configuration of the SD Card socket "object" */
+static sd_card_t sd_card = {
+    /* "pcName" is the FatFs "logical drive" identifier.
+    (See http://elm-chan.org/fsw/ff/doc/filename.html#vol) */
+    .pcName = "0:",
+    .type = SD_IF_SDIO,
+    .sdio_if_p = &sdio_if
+};
+
+/* Callbacks used by the library: */
+size_t sd_get_num() { return 1; }
+
+sd_card_t *sd_get_by_num(size_t num) {
+    if (0 == num)
+        return &sd_card;
+    else
+        return NULL;
+}
+
+
 
 #define ADC_NUM 0
 #define ADC_PIN (26 + ADC_NUM)
@@ -60,6 +98,10 @@
 #define MY_SUBVERSION 4
 
 void resetBlock(void);
+
+
+// filename
+char filename[32];
 
 
 // buffer to hold adc values from dma transfer
@@ -175,6 +217,7 @@ void core1_entry()
             *(pt8++)= ui32.ui8[1];
             *(pt8++)= ui32.ui8[2];
            }
+           //memcpy(block[theBlock].AD_Value,pt16,SAMPLE_BYTE_SIZE);
            // Done set it ready
            block[theBlock].status= BLOCK_READY;
            watchdog_update();
@@ -250,14 +293,13 @@ void resetBlock(void)
 bool FileValid = false;
 sd_card_t *pSD = NULL;
 FIL fil;
-char filename[32];
 
 
 void WriteToSD(void *pt, int ptSize)
 {
  static  uint32_t Tlen=0;
  static  uint32_t Fcount=1;
-
+ char _filename[40];
 
  if(pSD==NULL)
    {
@@ -266,20 +308,18 @@ void WriteToSD(void *pt, int ptSize)
 
 if(Tlen==0)
   {
-   datetime_t dt;
-   rtc_get_datetime(&dt);
+   sprintf(_filename,"%s_%04u.dat",filename,Fcount);
 
-   sprintf(filename,"ADC_%04d%02d%02d%02d%02d_%03u.dat",dt.year,dt.month,dt.day,dt.hour,dt.min,Fcount);
-   FRESULT fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
+   FRESULT fr = f_open(&fil, _filename, FA_OPEN_APPEND | FA_WRITE);
    if (FR_OK != fr && FR_EXIST != fr)
       {
-        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+        panic("f_open(%s) error: %s (%d)\n", _filename, FRESULT_str(fr), fr);
         FileValid= false;
       }
    else
    {
       Fcount++;
-      printf("open %s\n",filename);
+      printf("open %s\n",_filename);
       FileValid=true;
    }
   }
@@ -290,7 +330,7 @@ if(Tlen==0)
      f_write(&fil, pt,ptSize,&ptWritten);
      Tlen += ptSize;
 //     printf("%d written. Total= %llu bytes\n",ptWritten,Tlen);
-   if(Tlen > 2100000000)
+   if(Tlen > 1000000)
      {
        f_close(&fil);
        Tlen=0;
@@ -303,39 +343,10 @@ if(Tlen==0)
 
 int main() {
     int loop;
-//    set_sys_clock_pll(1440000000,3,3);
-//    clock_configure(clk_peri,
-//                        0,
-//                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-//                        160000000,160000000);
-
-// set clock 155Mhz
-    set_sys_clock_pll(930000000,6,1);
-// set clock_peri to 155MHz
-    clock_configure(clk_peri,
-                        0,
-                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                        155000000,155000000);
-/*
-// set clock 150Mhz
-    set_sys_clock_pll(1500000000,5,2);
-// set clock_peri to 150MHz
-    clock_configure(clk_peri,
-                        0,
-                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                        150000000,150000000);
-*/
-/*
-// set clock 133Mhz
-    set_sys_clock_pll(1596000000,6,2);
-// set clock_peri to 150MHz
-    clock_configure(clk_peri,
-                        0,
-                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                        133000000,133000000);
-*/
+    set_sys_clock_pll(930000000,6,1);  // set clock to 155Mhz
     stdio_init_all();
     time_init();
+
 
     printf("\n");
     printf("\npicoADC_SDCARD V%d.%d\n",MY_VERSION,MY_SUBVERSION);
@@ -378,35 +389,15 @@ int main() {
    printf("date:  %02d/%02d/%04d %02d:%02d:%02d\n",
             _now.day, _now.month, _now.year,
             _now.hour, _now.min, _now.sec);
-/*
-   // sdcard
+   fflush(stdout);
+   sleep_us(1000);
 
-   gpio_set_function(2, GPIO_FUNC_SPI);
-   gpio_set_function(3, GPIO_FUNC_SPI);
-   gpio_set_function(4, GPIO_FUNC_SPI);
-
-    // Chip select is active-low, so we'll initialise it to a driven-high state
-    gpio_init(5);
-    gpio_set_dir(5, GPIO_OUT);
-    gpio_put(5, 1);
-
-*/
-    pSD = sd_get_by_num(0);
-    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-    if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-    else
-      printf("SDCard mounted!\n");
-
-    printf("SPI clock %lu\n", spi_get_baudrate(spi0));
-
-    // Set A/D conversion to be 200K samples/sec
-    // 48Mhz / 200K => 240-1
 
     adc_init();
-//    adc_set_clkdiv(239); // 200k
+    adc_set_clkdiv(239); // 200k
 //    adc_set_clkdiv(479); // 100k
-    adc_set_clkdiv(319); // 150k
-    adc_gpio_init( ADC_PIN); 
+//    adc_set_clkdiv(319); // 150k
+    adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);
     adc_fifo_setup(
         true,    // Write each completed conversion to the sample FIFO
@@ -433,6 +424,22 @@ int main() {
 
     multicore_launch_core1(core1_entry);
 
+    pSD = sd_get_by_num(0);
+    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+    if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+    else
+     {
+      FIL fl;
+      fr = f_open(&fl,"Startup.txt", FA_OPEN_APPEND | FA_WRITE);
+      if(fr == FR_OK)
+        f_printf(&fl,"start:  %s %02d/%02d/%04d %02d:%02d:%02d\n",
+            filename, _now.day, _now.month, _now.year,
+            _now.hour, _now.min, _now.sec);
+        f_close(&fl);
+      printf("SDCard mounted!\n");
+      }
+   sprintf(filename,"ADC_%04d%02d%02d%02d%02d",_now.year,_now.month,_now.day,_now.hour,_now.min);
+    sleep_us(200000); // wait a little to stabilize the sd card
     watchdog_enable( 0x7fffff,1);
     int CurrentBlock=-1;
     int counter=0;
@@ -449,7 +456,7 @@ int main() {
                if((blockId % 1000)==0)
                  printf("Block Id : %lu\n",blockId);
                 watchdog_update();
-                WriteToSD(&block[blockReady].AD_Value,SAMPLE_12BIT_SIZE);
+                WriteToSD(&block[blockReady].AD_Value,SAMPLE_BYTE_SIZE);
                 block[blockReady].status=BLOCK_FREE;
               }
            }

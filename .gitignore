@@ -54,3 +54,5 @@ build/
 adcReader
 picoADC_USB/build
 picoADC_SDCARD/build
+picoADC_SDCARD_SDIO/build
+

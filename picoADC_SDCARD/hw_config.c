@@ -49,8 +49,13 @@ static spi_t spis[] = {  // One for each SPI.
 //          .baud_rate = 20833333,
 //          .baud_rate = 10416667,
 //        .baud_rate = 31250000,
-        .baud_rate = 37500000,
+
+// 150/4        .baud_rate = 37500000,
 //          .baud_rate = 33250000,
+
+// 155mhz/4
+        .baud_rate = 38750000,
+
     }
 };
 
