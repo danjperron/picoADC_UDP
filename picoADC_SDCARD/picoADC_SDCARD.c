@@ -308,6 +308,7 @@ int main() {
 //                        0,
 //                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
 //                        160000000,160000000);
+
 // set clock 150Mhz
     set_sys_clock_pll(1500000000,5,2);
 // set clock_peri to 150MHz
@@ -315,6 +316,15 @@ int main() {
                         0,
                         CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
                         150000000,150000000);
+/*
+// set clock 133Mhz
+    set_sys_clock_pll(1596000000,6,2);
+// set clock_peri to 150MHz
+    clock_configure(clk_peri,
+                        0,
+                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                        133000000,133000000);
+*/
     stdio_init_all();
     time_init();
 
@@ -384,8 +394,10 @@ int main() {
     // 48Mhz / 200K => 240-1
 
     adc_init();
-    adc_set_clkdiv(239);
-    adc_gpio_init( ADC_PIN);
+//    adc_set_clkdiv(239); // 200k
+//    adc_set_clkdiv(479); // 100k
+    adc_set_clkdiv(319); // 150k
+    adc_gpio_init( ADC_PIN); 
     adc_select_input( ADC_NUM);
     adc_fifo_setup(
         true,    // Write each completed conversion to the sample FIFO

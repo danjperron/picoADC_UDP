@@ -10,7 +10,7 @@
 
 
 #ifndef BLOCK_MAX
-  #define BLOCK_MAX 160
+  #define BLOCK_MAX 45
 #endif
 
 #define BLOCK_FREE   0

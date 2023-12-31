@@ -46,8 +46,11 @@ static spi_t spis[] = {  // One for each SPI.
         .sck_gpio = 2,
 //        .baud_rate = 12500 * 1000,  
 //        .baud_rate = 41666667,
+//          .baud_rate = 20833333,
+//          .baud_rate = 10416667,
 //        .baud_rate = 31250000,
         .baud_rate = 37500000,
+//          .baud_rate = 33250000,
     }
 };
 
