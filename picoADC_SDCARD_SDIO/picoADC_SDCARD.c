@@ -64,7 +64,7 @@ static sd_sdio_if_t sdio_if = {
     */
     .CMD_gpio = 7,
     .D0_gpio = 8,
-    .baud_rate = 12 * 1000 * 1000  // 15 MHz
+    .baud_rate = 14 * 1000 * 1000  // 15 MHz
 };
 
 /* Hardware Configuration of the SD Card socket "object" */
@@ -439,7 +439,7 @@ int main() {
       printf("SDCard mounted!\n");
       }
    sprintf(filename,"ADC_%04d%02d%02d%02d%02d",_now.year,_now.month,_now.day,_now.hour,_now.min);
-    sleep_us(200000); // wait a little to stabilize the sd card
+    sleep_us(1000); // wait a little to stabilize the sd card
     watchdog_enable( 0x7fffff,1);
     int CurrentBlock=-1;
     int counter=0;
@@ -458,6 +458,7 @@ int main() {
                 watchdog_update();
                 WriteToSD(&block[blockReady].AD_Value,SAMPLE_BYTE_SIZE);
                 block[blockReady].status=BLOCK_FREE;
+                sleep_us(500);
               }
            }
            else
