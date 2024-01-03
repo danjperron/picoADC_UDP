@@ -349,15 +349,6 @@ int main() {
 
     watchdog_enable( 0x7fffff,1);
 
-
-/*
-   // just let clean the two  first blocks
-   for(loop=0;loop<2;loop++)
-     {
-        while(getTailBlock() <0) sleep_us(100);
-        nextTailBlock();
-    }
-*/
     while (1) {
            int blockReady= getTailBlock();
            if(blockReady>=0)
