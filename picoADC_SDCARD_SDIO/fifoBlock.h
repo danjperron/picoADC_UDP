@@ -9,10 +9,6 @@
 
 
 
-#ifndef BLOCK_MAX
-  #define BLOCK_MAX 42
-#endif
-
 #define BLOCK_FREE   0
 #define BLOCK_READY  1
 #define BLOCK_LOCK   2
@@ -26,10 +22,10 @@ extern uint16_t  head_block;
 extern uint16_t  tail_block;
 
 // fifo block head and tail pointer function
-int getHeadBlock(uint16_t status);
-int getTailBlock(uint16_t status);
-int getTotalBlock(uint16_t status);
-int getBlockId(uint32_t blockid, uint16_t status);
-int getTailLowerBlock(uint16_t status,uint32_t blockID);
+int getHeadBlock();
+int getTailBlock();
+int nextHeadBlock();
+int nextTailBlock();
+
 #endif
 
