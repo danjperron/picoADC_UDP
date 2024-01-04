@@ -221,7 +221,7 @@ void * rcv_udp_thread(void * arg)
               {
                 if(totalready > (BLOCK_MAX-5))
                   {
-                   idx = getTailLowerBlock(BLOCK_READY,blockId);
+                   idx = getTailLowerBlock(blockId,BLOCK_READY);
                   }
                }
            if(idx>=0)

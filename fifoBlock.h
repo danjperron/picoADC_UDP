@@ -10,7 +10,7 @@
 
 
 #ifndef BLOCK_MAX
-  #define BLOCK_MAX 160
+  #define BLOCK_MAX 90
 #endif
 
 #define BLOCK_FREE   0
@@ -22,14 +22,14 @@
 extern SampleBlockStruct block[BLOCK_MAX];
 
 // fifo pointer
-extern uint16_t  head_block;
-extern uint16_t  tail_block;
+extern int16_t  head_block;
+extern int16_t  tail_block;
 
 // fifo block head and tail pointer function
-int getHeadBlock(uint16_t status);
-int getTailBlock(uint16_t status);
-int getTotalBlock(uint16_t status);
-int getBlockId(uint32_t blockid, uint16_t status);
-int getTailLowerBlock(uint16_t status,uint32_t blockID);
+int16_t getHeadBlock(uint8_t status);
+int16_t getTailBlock(uint8_t status);
+int16_t getTotalBlock(uint8_t status);
+int16_t getBlockId(uint32_t blockid, uint8_t status);
+int16_t getTailLowerBlock(uint32_t blockID,uint8_t status);
 #endif
 

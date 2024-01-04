@@ -157,6 +157,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_0, true);
     channel_config_set_chain_to	(&c_0,dma_1);
     channel_config_set_dreq(&c_0, DREQ_ADC);
+    channel_config_set_irq_quiet(&c_0, true);
 
     // set second DMA
     dma_channel_config c_1 = dma_channel_get_default_config(dma_1);
@@ -165,6 +166,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_1, true);
     channel_config_set_chain_to	(&c_1,dma_0);
     channel_config_set_dreq(&c_1, DREQ_ADC);
+    channel_config_set_irq_quiet(&c_1, true);
 
    // start first DMA , get head block and  lock block
 
@@ -364,6 +366,8 @@ int main() {
     sleep_ms(5000);
     // initialize wifi
 
+    set_sys_clock_pll(930000000,6,1);  // set clock to 155Mhz
+
     if (cyw43_arch_init()) {
         printf("Init failed!\n");
         return 1;
@@ -387,7 +391,9 @@ int main() {
 
     // Set A/D conversion to be 200K samples/sec
     // 48Mhz / 200K => 240-1
-    adc_set_clkdiv(239);
+    adc_set_clkdiv(239); // 200k
+//    adc_set_clkdiv(319);  //150k
+//    adc_set_clkdiv(250);  //192k
     adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);
     adc_fifo_setup(

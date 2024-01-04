@@ -11,7 +11,8 @@ add_executable(${PROJECT} ${PROJECT}.c)
 project(${PROJECT} C CXX ASM)
 pico_sdk_init()
 
-add_subdirectory(../FatFs_SPI build)
+
+add_subdirectory(../../no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src build)
 
 target_sources(${PROJECT} PRIVATE
         ${PROJECT}.c

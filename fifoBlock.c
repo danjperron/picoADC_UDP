@@ -3,19 +3,18 @@
 #include "fifoBlock.h"
 
 
-
 // fifo pointer
-uint16_t  head_block=0;
-uint16_t  tail_block=0;
+int16_t  head_block=0;
+int16_t  tail_block=0;
 
 // fifo block head and tail pointer function
 SampleBlockStruct block[BLOCK_MAX];
 
-int getBlock(uint16_t pointer, uint16_t status)
+int16_t getBlock(int16_t pointer, uint8_t status)
 {
-  for(int loop=0;loop<BLOCK_MAX;loop++)
+  for(int16_t loop=0;loop<BLOCK_MAX;loop++)
      {
-       uint16_t  theBlock = (pointer + loop) % BLOCK_MAX;
+       int16_t  theBlock = (pointer + loop) % BLOCK_MAX;
        if(block[theBlock].status == status)
             return theBlock;
      }
@@ -23,33 +22,37 @@ int getBlock(uint16_t pointer, uint16_t status)
 }
 
 
-int getHeadBlock(uint16_t status)
+int16_t getHeadBlock(uint8_t status)
 {
-    return( getBlock(head_block++,status));
+  int16_t t=getBlock(head_block,status);
+  if(t>=0)
+          head_block=((t+1) % BLOCK_MAX);
+    return t;
 }
 
-int getTailBlock(uint16_t status)
+int16_t getTailBlock(uint8_t status)
 {
-    return( getBlock(tail_block++,status));
+  int16_t t=getBlock(tail_block,status);
+  if(t>=0)
+          tail_block=((t+1) % BLOCK_MAX);
+    return t;
 }
 
-int getTotalBlock(uint16_t status)
+int16_t getTotalBlock(uint8_t status)
 {
-  int total=0;
+  uint16_t total=0;
   for(int loop=0;loop<BLOCK_MAX;loop++)
      {
-//       printf("block[%d]:%d%c",loop,block[loop].status, loop%5 ? '\t' : '\n');
        if(block[loop].status == status)
         total++;
      }
-//  printf("\n");
   return total;
 }
 
-int getBlockId(uint32_t blockID, uint16_t status)
+int16_t getBlockId(uint32_t blockID, uint8_t status)
 {
   if(blockID==0) return -1;
-  for(int loop=0;loop<BLOCK_MAX;loop++)
+  for(int16_t loop=0;loop<BLOCK_MAX;loop++)
     if(block[loop].status == status)
       if(block[loop].blockId == blockID)
           return loop;
@@ -57,11 +60,11 @@ int getBlockId(uint32_t blockID, uint16_t status)
 }
 
 
-int getTailLowerBlock(uint16_t status,uint32_t blockID)
+int16_t getTailLowerBlock(uint32_t blockID,uint8_t status)
 {
   uint32_t  _tblockId = 0xffffffff;
-  int _tidx = -1;
-  for(int loop=0;loop<BLOCK_MAX;loop++)
+  int16_t _tidx = -1;
+  for(int16_t loop=0;loop<BLOCK_MAX;loop++)
     if(block[loop].status == status)
        {
          if(block[loop].blockId< blockID)
@@ -76,7 +79,7 @@ int getTailLowerBlock(uint16_t status,uint32_t blockID)
             }
        }
   if(_tidx>=0)
-       tail_block=_tidx;
+       tail_block=(( _tidx + 1) % BLOCK_MAX);
   return _tidx;
 }
 

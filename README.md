@@ -16,19 +16,22 @@ Core1 takes care of the ADC DMA and push the value into a circular fifo block wh
 Core0 reads the fifo block and transfers it to the UDP socket.<br>
 
 
-*** new update USB SERIAL ** dec 28
+*** new update USB SERIAL ** Jan 3. 2023
 USB serial communication added.<br>
-16 bits to 12 bits conversion and then encoded in base64 (including 6 bytes time_us_64() stamp)<br>
-On Pi5 you need to use the base64 since the PI5 on USB serial is slower.
-On Pi4 no problem.
-To decode the signal you need to decode base64 first. the first 6 bytes are the timeStamp. the next are 12bits sample.
- 3 bytes convert to 2 samples of 12 bytes.
+16 bits encoded to base64(including 6 bytes time_us_64() stamp)<br>
+To decode the signal you need to decode base64 first. the first 6 bytes are the timeStamp. the next are 16bits sample.
+I included the adctousb.py   
+   just run "python3 adctousb.py >data.dat".  The software assume /dev/ttyACM0
+
+
+**** SDCard  SPI and SDIO working
+You need to clone  https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+and set the folder location into the CMakeLists.txt in the SDCard folders
+don't forget to create a build folder and do "cmake .."  and  "make" 
 
 
 
-
-
-*** update ***
+*** update  UDP WIFI***
 The adc transfer now use 12bits instead of 16 bits since the highest nibble was always 0.
 This help be reducing the number of bytes to be send. This way the packet size is smaller and  reduce the bandwith ~25%.
 

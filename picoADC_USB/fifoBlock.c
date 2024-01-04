@@ -3,6 +3,7 @@
 #include "fifoBlock.h"
 
 
+
 // fifo pointer
 uint16_t  head_block=0;
 uint16_t  tail_block=0;
@@ -12,40 +13,35 @@ SampleBlockStruct block[BLOCK_MAX];
 
 int getHeadBlock()
 {
-    int new_head = (head_block + 1) % BLOCK_MAX;
-    if(new_head == tail_block)
-       return -1;
-    return head_block;
+  uint16_t new_head= ((head_block + 1)  % BLOCK_MAX);
+  if(new_head==tail_block)
+    return -1;
+  return head_block;
 }
 
-int getNextHeadBlock()
+int nextHeadBlock()
 {
-    int new_head = (head_block + 1) % BLOCK_MAX;
-    if(new_head == tail_block)
-       return -1;
-    return new_head;
+  uint16_t new_head= ((head_block + 1)  % BLOCK_MAX);
+  if(new_head>=0)
+       head_block=new_head;
+  return new_head;
 }
 
 int getTailBlock()
 {
-    if( tail_block == head_block)
-        return -1;
+    if(head_block == tail_block)
+      return -1;
     return tail_block;
 }
 
-
-void nextHeadBlock()
+int nextTailBlock()
 {
-   head_block = (head_block + 1) % BLOCK_MAX;
+  uint16_t new_tail=  getTailBlock();
+  if(new_tail<0)
+    return -1;
+  tail_block = ((++tail_block)  % BLOCK_MAX);
+  return tail_block;
 }
-
-void nextTailBlock()
-{
-  tail_block = (tail_block + 1) % BLOCK_MAX;
-}
-
-
-
 
 
 

@@ -115,6 +115,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_0, true);
     channel_config_set_chain_to	(&c_0,dma_1);
     channel_config_set_dreq(&c_0, DREQ_ADC);
+    channel_config_set_irq_quiet(&c_0, true);
 
     // set second DMA
     dma_channel_config c_1 = dma_channel_get_default_config(dma_1);
@@ -123,7 +124,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_1, true);
     channel_config_set_chain_to	(&c_1,dma_0);
     channel_config_set_dreq(&c_1, DREQ_ADC);
-
+    channel_config_set_irq_quiet(&c_1, true);
    // start first DMA , get head block and  lock block
 
    dma_channel_configure(dma_0, &c_0,

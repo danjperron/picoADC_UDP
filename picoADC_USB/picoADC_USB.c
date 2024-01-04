@@ -128,27 +128,11 @@ int16_t temp16;
 
 
 // ok just 48bits microsecond for timeStamp is enough
-#ifdef USE_BASE64
+
 pt = base64_encode((char *) adc_hex,(unsigned char *) &block[idx].timeStamp,6);
-
-#else
- char *pt;=adc_hex
-
-for(loop=44;loop>=0;loop-=4)
-    *(pt++) = hexTable[(temp64 >> loop) & 0xf];
-*(pt++) = '\t';
-#endif
 pt8 = block[idx].AD_Value;
 
-#ifdef USE_BASE64
    pt = base64_encode((char *) pt,(unsigned char *) pt8,SAMPLE_BYTE_SIZE);
-#else
-    for(loop=0;loop<SAMPLE_BYTE_SIZE;loop++)
-    {
-      *(pt++)= hexTable[(*pt8>>4) & 0xf];
-      *(pt++)= hexTable[(*pt8++) & 0xf];
-    }
-#endif
 
    *(pt++) = '\n';
    *(pt++) = 0;
@@ -190,6 +174,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_0, true);
     channel_config_set_chain_to	(&c_0,dma_1);
     channel_config_set_dreq(&c_0, DREQ_ADC);
+    channel_config_set_irq_quiet(&c_0, true);
 
     // set second DMA
     dma_channel_config c_1 = dma_channel_get_default_config(dma_1);
@@ -198,7 +183,7 @@ void core1_entry()
     channel_config_set_write_increment(&c_1, true);
     channel_config_set_chain_to	(&c_1,dma_0);
     channel_config_set_dreq(&c_1, DREQ_ADC);
-
+    channel_config_set_irq_quiet(&c_1, true);
    // start first DMA , get head block and  lock block
 
    dma_channel_configure(dma_0, &c_0,
@@ -228,6 +213,8 @@ void core1_entry()
    {
       block[Idx].blockId = blockId;
       block[Idx].timeStamp = time_us_64();
+      memcpy(block[Idx].AD_Value, whichDMA ? adc_dma1:adc_dma0, SAMPLE_BYTE_SIZE);
+/*
       // pack to 12 bits
       pt16 = whichDMA ? adc_dma1 : adc_dma0;
       pt8  = block[Idx].AD_Value;
@@ -240,6 +227,7 @@ void core1_entry()
         *(pt8++)= (*(pt16++)>>4) & 0xff;
        }
       // done move head
+*/
       nextHeadBlock();
    }
   }
