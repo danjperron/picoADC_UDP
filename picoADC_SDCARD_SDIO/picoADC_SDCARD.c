@@ -309,8 +309,8 @@ int main() {
    sleep_us(1000);
 
     adc_init();
-    adc_set_clkdiv(239); // 200k
-    //    adc_set_clkdiv(479); // 100k
+    //adc_set_clkdiv(239); // 200k
+        adc_set_clkdiv(479); // 100k
     //    adc_set_clkdiv(319); // 150k
     adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);

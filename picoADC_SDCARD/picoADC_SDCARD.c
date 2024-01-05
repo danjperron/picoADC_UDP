@@ -68,19 +68,7 @@ void resetBlock(void);
 
 
 int32_t blockId=0;
-int32_t previousBlockId=0;
-int overrunCount=0;
 
-
-// start stop control
-// on stop blockId is zero
-// on stop unit will send  blockId zero with no data
-// when received start blockId is reset and increment with data
-
-StartStopStruct controlBlock;
-
-// mutex for for block manipulation
-static mutex_t blockMutex;
 
 
 //   ***********************************
@@ -94,9 +82,8 @@ void core1_entry()
 {
    //  packet block  hold  ADC data and sample block id
 
-    int sampleIdx;
+    int theBlock = -1;
     int loop;
-    uint16_t  totalPile=0;
     union_ui32  ui32;
     uint16_t *pt16;
     uint8_t *pt8;
@@ -148,100 +135,36 @@ void core1_entry()
       );
    // wait until dma is done
    dma_channel_wait_for_finish_blocking(whichDMA ? dma_1 : dma_0);
-   int theBlock = -1;
-   if(controlBlock.start_stop)
+   theBlock = getHeadBlock();
+   blockId++;
+   if(theBlock>=0)
     {
-       theBlock = getHeadBlock(BLOCK_FREE);
-       blockId++;
-       if(theBlock>=0)
-        {
-          // ok Lock the block
-          mutex_enter_blocking(&blockMutex);
-          block[theBlock].status=BLOCK_LOCK;
-          mutex_exit(&blockMutex);
-          // fill the block
-          block[theBlock].blockId = blockId;
-          previousBlockId = blockId;
-          block[theBlock].sampleCount= SAMPLE_CHUNK_SIZE;
-          overrunCount=0;
-          block[theBlock].timeStamp = time_us_64();
-          // fill data
-          // need to transfer adc dma to block  (16 bit to 12bit)
-           pt16 = whichDMA ? adc_dma1 : adc_dma0;
-           pt8  = block[theBlock].AD_Value;
-           for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
-           {
-            ui32.ui32 = ((uint32_t)  pt16[loop] & 0xfff) | ((((uint32_t) pt16[loop+1]) << 12) & 0xfff000);
-            *(pt8++)= ui32.ui8[0];
-            *(pt8++)= ui32.ui8[1];
-            *(pt8++)= ui32.ui8[2];
-           }
-           // Done set it ready
-           block[theBlock].status= BLOCK_READY;
-           watchdog_update();
-          }
-        else
-        {
-             printf("\nGot Overrun  Total Free is %u\n",getTotalBlock(BLOCK_FREE));
-
-             if(controlBlock.skipOverrunBlock)
-             {
-               printf("Continue! Increment OverrunCount to %d\n",++overrunCount);
-             }
-             else
-               {
-                 // ok overrun
-                    controlBlock.start_stop=0;
-                    printf("*******Reset\n\n");
-                    watchdog_reboot(0,0,50000);
-                    sleep_ms(1000000); // wait for watchdog to reboot;
-                }
-        }
-     }
-     else
-        {
-          //blockId=0;
-          previousBlockId=0;
-        }
+      block[theBlock].timeStamp = time_us_64();
+      // fill data
+      // need to transfer adc dma to block  (16 bit to 12bit)
+       pt16 = whichDMA ? adc_dma1 : adc_dma0;
+       pt8  = block[theBlock].AD_Value;
+       for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
+       {
+        ui32.ui32 = ((uint32_t)  pt16[loop] & 0xfff) | ((((uint32_t) pt16[loop+1]) << 12) & 0xfff000);
+        *(pt8++)= ui32.ui8[0];
+        *(pt8++)= ui32.ui8[1];
+        *(pt8++)= ui32.ui8[2];
+       }
+       nextHeadBlock();
+       watchdog_update();
+      }
+    else
+    {
+             // ok overrun
+                printf("*******Reset\n\n");
+                watchdog_reboot(0,0,50000);
+                sleep_ms(1000000); // wait for watchdog to reboot;
+    }
      whichDMA = !whichDMA;  // swap DMA channel
   }
 }
 
-
-// this routine is to find blockId in block and free block
-void    setAckBlockId(uint32_t blockID)
-{
-   if(blockId ==0) return;  // blockId =0 invalid
-
-   // lock using mutex
-    mutex_enter_blocking(&blockMutex);
-
-    int blockIdx = getBlockId(blockID,BLOCK_READY);
-    if(blockIdx>=0)
-           block[blockIdx].status= BLOCK_FREE;
-  // free mutex
-  mutex_exit(&blockMutex);
-}
-
-
-void resetBlock(void)
-{
-  // need to reset everything
-    mutex_enter_blocking(&blockMutex);
-    controlBlock.start_stop=0;
-    blockId=0;
-   for(int loop=0;loop<BLOCK_MAX;loop++)
-    {
-       block[loop].blockId = 0;  // invalidate block id
-       block[loop].packetId = SAMPLE_ID;
-       block[loop].packetSize = sizeof(SampleBlockStruct);
-       block[loop].status= BLOCK_FREE; // Fill all samples in block to have the Ack done.
-   }
-  overrunCount=0;
-  controlBlock.start_stop=1;
-
-  mutex_exit(&blockMutex);
-}
 
 
 
@@ -372,6 +295,7 @@ int main() {
             _now.day, _now.month, _now.year,
             _now.hour, _now.min, _now.sec);
 
+/*
    // rtc init
    printf("Get RTC\n");
    initDS3231();
@@ -379,18 +303,6 @@ int main() {
    printf("date:  %02d/%02d/%04d %02d:%02d:%02d\n",
             _now.day, _now.month, _now.year,
             _now.hour, _now.min, _now.sec);
-/*
-   // sdcard
-
-   gpio_set_function(2, GPIO_FUNC_SPI);
-   gpio_set_function(3, GPIO_FUNC_SPI);
-   gpio_set_function(4, GPIO_FUNC_SPI);
-
-    // Chip select is active-low, so we'll initialise it to a driven-high state
-    gpio_init(5);
-    gpio_set_dir(5, GPIO_OUT);
-    gpio_put(5, 1);
-
 */
     pSD = sd_get_by_num(0);
     FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
@@ -404,9 +316,9 @@ int main() {
     // 48Mhz / 200K => 240-1
 
     adc_init();
-//    adc_set_clkdiv(239); // 200k
+    adc_set_clkdiv(239); // 200k
 //    adc_set_clkdiv(479); // 100k
-    adc_set_clkdiv(319); // 150k
+//    adc_set_clkdiv(319); // 150k
     adc_gpio_init( ADC_PIN); 
     adc_select_input( ADC_NUM);
     adc_fifo_setup(
@@ -417,49 +329,30 @@ int main() {
         false     // Shift each sample to 8 bits when pushing to FIFO
     );
 
-   // initialize control block
-   controlBlock.packetId = STARTSTOP_ID;
-   controlBlock.start_stop= 0;
 
-
-    // create mutex to ack block id
-    mutex_init(&blockMutex);
-
-
-   // from start sort block from static_block
-   // set default block size and ID
-   resetBlock();
-
+   blockId = 0;
+   head_block = 0;
+   tail_block = 0;
 
 
     multicore_launch_core1(core1_entry);
 
     watchdog_enable( 0x7fffff,1);
-    int CurrentBlock=-1;
-    int counter=0;
-    int maxPile=0;
-    int currentPile=0;
-    controlBlock.start_stop=1;
 
     while (1) {
-          if(controlBlock.start_stop)
-          {
-           int blockReady= getTailBlock(BLOCK_READY);
+           int blockReady= getTailBlock();
            if(blockReady>=0)
                {
-               if((blockId % 1000)==0)
-                 printf("Block Id : %lu\n",blockId);
-                watchdog_update();
-                WriteToSD(&block[blockReady].AD_Value,SAMPLE_12BIT_SIZE);
-                block[blockReady].status=BLOCK_FREE;
+                WriteToSD(&block[blockReady].AD_Value,SAMPLE_BYTE_SIZE);
+                nextTailBlock();
               }
-           }
            else
             {
                //stop mode just update watch dog
                // every ~second . this way the other computer will know the IP
-                watchdog_update();
+               sleep_us(100);
             }
+            watchdog_update();
         }
     return 0;
 }

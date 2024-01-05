@@ -391,8 +391,10 @@ int main() {
 
     // Set A/D conversion to be 200K samples/sec
     // 48Mhz / 200K => 240-1
+    //adc_set_clkdiv(479); // 100k
     adc_set_clkdiv(239); // 200k
-//    adc_set_clkdiv(319);  //150k
+
+    //adc_set_clkdiv(319);  //150k
 //    adc_set_clkdiv(250);  //192k
     adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);
@@ -455,7 +457,7 @@ int main() {
            if(blockReady>=0)
             {
 
-              if((blockReady != CurrentBlock) || (time_us_64()- block[blockReady].timeStamp > 5000))  // 1500/200k ~ 7.5ms  if more than 5ms just resend
+//              if((blockReady != CurrentBlock) || (time_us_64()- block[blockReady].timeStamp > 5000))  // 1500/200k ~ 7.5ms  if more than 5ms just resend
               {
                 block[blockReady].timeStamp=time_us_64();
               if(block[blockReady].blockId==0)
@@ -464,7 +466,6 @@ int main() {
                      continue;
                   }
               SendUDP(&block[blockReady],sizeof(SampleBlockStruct));
-
 
               CurrentBlock=blockReady;
               }
@@ -495,8 +496,10 @@ int main() {
                 watchdog_update();
                 pingFlag= ++pingFlag % 80;
                 broadcastUDP(SEND_TO_PORT,&DummyPing,sizeof(DummyPing));
+
             }
-         cyw43_arch_poll();
+                cyw43_arch_poll();
+
         }
     return 0;
 }

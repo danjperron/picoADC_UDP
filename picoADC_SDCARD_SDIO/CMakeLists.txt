@@ -20,9 +20,9 @@ target_sources(${PROJECT} PRIVATE
         ds3231.c
         )
 
-target_compile_definitions(picoADC_SDCARD PRIVATE
-            WIFI_SSID=\"labtest\"
-            WIFI_PASSWORD=\"ltjix68233\"
+target_compile_definitions(${PROJECT} PRIVATE
+            WIFI_SSID=\"${WIFI_SSID}\"
+            WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
             )
 
 
@@ -38,6 +38,7 @@ target_link_libraries(${PROJECT}
      hardware_dma
      FatFs_SPI
 )
+
 
 pico_add_extra_outputs(${PROJECT})
 pico_enable_stdio_usb(${PROJECT} 0)
