@@ -1,4 +1,4 @@
-
+ 
 /**
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -70,10 +70,9 @@ void resetBlock(void);
 int32_t blockId=0;
 
 
-#define USE_BASE64
-//#define USE_HEX12
+#define USE_12BITS
 
-#ifdef USE_BASE64
+
 static char base64Table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
                                 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
                                 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
@@ -89,13 +88,14 @@ char *  base64_encode(char *dest, const unsigned char *data,int input_length)
     int output_length = 4 * ((input_length + 2) / 3);
 
 
-    for (int i = 0, j = 0; i < input_length;) {
+    for (int i = 0; i < input_length;) {
 
         uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
         uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
         uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
 
         uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
 
         *(dest++) = base64Table[(triple >> 18) & 0x3F];
         *(dest++) = base64Table[(triple >> 12) & 0x3F];
@@ -108,14 +108,15 @@ char *  base64_encode(char *dest, const unsigned char *data,int input_length)
     return dest;
 }
 
+char *  base64_encode_12bits(char *dest, const unsigned short *data,int input_length)
+{
+    for (int i = 0;i < input_length;i++) {
+         *(dest++) = base64Table[(*data>>6)& 0x3f];
+         *(dest++) = base64Table[*(data++)& 0x3f];
+    }
+    return dest;
+}
 
-
-
-
-
-#endif
-const char  hexTable [16]= {'0','1','2','3','4','5','6','7',
-                            '8','9','A','B','C','D','E','F'};
 
 void SendToUSB(int idx)
 {
@@ -132,15 +133,16 @@ int16_t temp16;
 pt = base64_encode((char *) adc_hex,(unsigned char *) &block[idx].timeStamp,6);
 pt8 = block[idx].AD_Value;
 
+#ifdef USE_12BITS
+   pt = base64_encode_12bits((char *) pt,(unsigned short *) pt8,SAMPLE_CHUNK_SIZE);
+#else
    pt = base64_encode((char *) pt,(unsigned char *) pt8,SAMPLE_BYTE_SIZE);
+#endif
 
-   *(pt++) = '\n';
    *(pt++) = 0;
    puts_raw(adc_hex);
    stdio_flush();
-
 }
-
 
 
 
@@ -214,20 +216,6 @@ void core1_entry()
       block[Idx].blockId = blockId;
       block[Idx].timeStamp = time_us_64();
       memcpy(block[Idx].AD_Value, whichDMA ? adc_dma1:adc_dma0, SAMPLE_BYTE_SIZE);
-/*
-      // pack to 12 bits
-      pt16 = whichDMA ? adc_dma1 : adc_dma0;
-      pt8  = block[Idx].AD_Value;
-      uint8_t temp8;
-       for( int loop=0;loop<SAMPLE_CHUNK_SIZE;loop+=2)
-       {
-        *(pt8++)= *pt16 & 0xff;
-        temp8 = (*(pt16++) >>8) & 0xf;
-        *(pt8++)=  temp8 | ((*pt16 << 4) & 0xf0);
-        *(pt8++)= (*(pt16++)>>4) & 0xff;
-       }
-      // done move head
-*/
       nextHeadBlock();
    }
   }
@@ -279,7 +267,8 @@ int main() {
 
     // Set A/D conversion to be 200K samples/sec
     // 48Mhz / 200K => 240-1
-    adc_set_clkdiv(239);
+    //adc_set_clkdiv(191);  // 250K samples/sec
+    adc_set_clkdiv(239); 
     adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);
     adc_fifo_setup(
