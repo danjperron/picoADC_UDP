@@ -23,6 +23,8 @@ To decode the signal you need to decode base64 first. the first 6 bytes are the 
 I included the adctousb.py   
    just run "python3 adctousb.py >data.dat".  The software assume /dev/ttyACM0
 
+*** A faster version in C (I was able to capture at 250K samples/sec on Pi4)
+             cat /dev/ttyACM0 | ./usb2bin > data.dat
 
 **** SDCard  SPI and SDIO working
 You need to clone  https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico

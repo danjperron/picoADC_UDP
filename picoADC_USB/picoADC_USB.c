@@ -268,7 +268,7 @@ int main() {
     // Set A/D conversion to be 200K samples/sec
     // 48Mhz / 200K => 240-1
     //adc_set_clkdiv(191);  // 250K samples/sec
-    adc_set_clkdiv(239); 
+    adc_set_clkdiv(239);
     adc_gpio_init( ADC_PIN);
     adc_select_input( ADC_NUM);
     adc_fifo_setup(
