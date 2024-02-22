@@ -116,7 +116,6 @@ int main(void)
            // use the same buffer since we will never overwrite
            if(!base64Decode12Bits(&buffer[8],1200,buffer))
                 continue;
-           unsigned short *spt=(unsigned short *) buffer;
            if(!FirstStamp)
             {
               timeStampDelta = timeStamp-timeStampPrevious;
